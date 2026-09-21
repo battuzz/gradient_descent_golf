@@ -140,6 +140,14 @@ h1 { font-size: 22px; margin: 8px 0 4px; letter-spacing: -0.02em; }
   border-radius: 999px; padding: 6px 12px; font-size: 12px; font-weight: 600; cursor: pointer;
 }
 
+.stop-btn {
+  background: transparent; border: 1px dashed var(--border); color: var(--muted);
+  border-radius: 12px; padding: 10px; font-size: 13px; font-weight: 600; cursor: pointer;
+}
+.stop-btn.confirm {
+  background: #3a1420; border: 1px solid var(--danger); border-style: solid; color: var(--danger);
+}
+
 .btn {
   flex: 1; padding: 13px; border-radius: 14px; border: 1px solid var(--border);
   background: var(--panel-solid); font-weight: 700; cursor: pointer; font-size: 14px;

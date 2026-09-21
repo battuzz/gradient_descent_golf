@@ -111,9 +111,23 @@ function Round({ event, name, diff, onAgain, onMenu }: {
   const [flight, setFlight] = useState<Flight | null>(null);
   const [wTarget, setWTarget] = useState(ls.start[2]);
   const [autoAim, setAutoAim] = useState(diff.autoAim);
+  const [earlyStop, setEarlyStop] = useState(false);
+  const [confirmStop, setConfirmStop] = useState(false);
+  const confirmTimer = useRef<number | undefined>(undefined);
 
   const shotsTaken = path.length - 1;
-  const done = shotsTaken >= diff.shots && !flight;
+  const done = (shotsTaken >= diff.shots || earlyStop) && !flight;
+
+  const requestStop = () => {
+    if (confirmStop) {
+      window.clearTimeout(confirmTimer.current);
+      setEarlyStop(true);
+      return;
+    }
+    setConfirmStop(true);
+    confirmTimer.current = window.setTimeout(() => setConfirmStop(false), 3000);
+  };
+  useEffect(() => () => window.clearTimeout(confirmTimer.current), []);
   const cur = path[path.length - 1];
   const bestLoss = Math.min(...losses.slice(1), Infinity);
 
@@ -130,6 +144,8 @@ function Round({ event, name, diff, onAgain, onMenu }: {
 
   const onShoot = (step: [number, number]) => {
     if (flight || shotsTaken >= diff.shots) return;
+    setConfirmStop(false);
+    window.clearTimeout(confirmTimer.current);
     const r = rng(hashString(`${seed}:l:${shotsTaken}`));
     const to: Vec3 = [
       clamp(cur[0] + step[0] + gauss(r) * diff.landNoise, -1, 1),
@@ -261,6 +277,11 @@ function Round({ event, name, diff, onAgain, onMenu }: {
               {shotsTaken === 0 ? 'Drag on the map to shoot' : `${diff.shots - shotsTaken} shots left`}
             </span>
           </div>
+          {shotsTaken > 0 && (
+            <button className={`stop-btn ${confirmStop ? 'confirm' : ''}`} onClick={requestStop}>
+              {confirmStop ? 'Tap again to lock it in' : "I've found it — finish round"}
+            </button>
+          )}
         </div>
       ) : (
         <div className="result">
@@ -269,6 +290,9 @@ function Round({ event, name, diff, onAgain, onMenu }: {
           </div>
           <div className="muted">
             best loss <b>{bestLoss.toFixed(3)}</b> · global minimum <b>{ls.lo.toFixed(3)}</b>
+            {earlyStop && shotsTaken < diff.shots && (
+              <> · finished early ({shotsTaken}/{diff.shots} shots used)</>
+            )}
           </div>
           <div className={`status ${status}`}>
             {status === 'sending' && 'Publishing your score…'}
