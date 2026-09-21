@@ -223,9 +223,9 @@ function Round({ event, name, diff, onAgain, onMenu }: {
       </div>
 
       <div className="stats">
-        <Stat label="Loss now" value={losses[losses.length - 1].toFixed(diff.lossDecimals)} />
-        <Stat label="Best" value={Number.isFinite(bestLoss) ? bestLoss.toFixed(diff.lossDecimals) : '—'} accent />
-        {diff.showGradNorm && <Stat label="‖∇L‖" value={hint.mag.toFixed(2)} />}
+        <Stat label="Loss now" value={losses[losses.length - 1].toFixed(3)} />
+        <Stat label="Best" value={Number.isFinite(bestLoss) ? bestLoss.toFixed(3) : '—'} accent />
+        <Stat label="‖∇L‖" value={hint.mag.toFixed(2)} />
         {ls.fourD && <Stat label="w" value={cur[2].toFixed(2)} />}
       </div>
 
@@ -247,7 +247,7 @@ function Round({ event, name, diff, onAgain, onMenu }: {
 
       {!done ? (
         <div className="controls">
-          {diff.showSparkline && <Sparkline losses={losses} lo={ls.lo} hi={ls.hi} />}
+          <Sparkline losses={losses} lo={ls.lo} hi={ls.hi} />
           {ls.fourD && (
             <div className="slider">
               <div className="slider-label">
