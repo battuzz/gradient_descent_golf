@@ -215,27 +215,25 @@ export function GameCanvas(props: Props) {
 
       // gradient hint + aiming
       if (!p.disabled && !p.flight) {
-        if (p.diff.showGradientHint) {
-          const pulse = 0.75 + 0.25 * Math.sin(now / 260);
-          const hx = p.hintDir[0];
-          const hy = p.hintDir[1];
-          const L = 44;
-          ctx.strokeStyle = `rgba(255,214,102,${pulse})`;
-          ctx.fillStyle = `rgba(255,214,102,${pulse})`;
-          ctx.lineWidth = 3;
-          ctx.lineCap = 'round';
-          ctx.beginPath();
-          ctx.moveTo(bx + hx * 14, by + hy * 14);
-          ctx.lineTo(bx + hx * L, by + hy * L);
-          ctx.stroke();
-          const ex = bx + hx * (L + 8);
-          const ey = by + hy * (L + 8);
-          ctx.beginPath();
-          ctx.moveTo(ex, ey);
-          ctx.lineTo(ex - hx * 12 - hy * 7, ey - hy * 12 + hx * 7);
-          ctx.lineTo(ex - hx * 12 + hy * 7, ey - hy * 12 - hx * 7);
-          ctx.fill();
-        }
+        const pulse = 0.75 + 0.25 * Math.sin(now / 260);
+        const hx = p.hintDir[0];
+        const hy = p.hintDir[1];
+        const L = 44;
+        ctx.strokeStyle = `rgba(255,214,102,${pulse})`;
+        ctx.fillStyle = `rgba(255,214,102,${pulse})`;
+        ctx.lineWidth = 3;
+        ctx.lineCap = 'round';
+        ctx.beginPath();
+        ctx.moveTo(bx + hx * 14, by + hy * 14);
+        ctx.lineTo(bx + hx * L, by + hy * L);
+        ctx.stroke();
+        const ex = bx + hx * (L + 8);
+        const ey = by + hy * (L + 8);
+        ctx.beginPath();
+        ctx.moveTo(ex, ey);
+        ctx.lineTo(ex - hx * 12 - hy * 7, ey - hy * 12 + hx * 7);
+        ctx.lineTo(ex - hx * 12 + hy * 7, ey - hy * 12 - hx * 7);
+        ctx.fill();
 
         const a = aimRef.current;
         if (a) {

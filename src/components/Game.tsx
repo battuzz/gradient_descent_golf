@@ -75,7 +75,7 @@ function Setup(props: {
 
       <div className="how">
         <div><b>Drag</b> on the map to shoot. Drag length = <b>learning rate</b>.</div>
-        <div><span className="arrow">➤</span> On Batch GD a yellow arrow shows the <b>−gradient</b> — higher difficulties fly blind.</div>
+        <div><span className="arrow">➤</span> The yellow arrow is the (noisy) <b>−gradient</b>.</div>
         <div>Fog hides the terrain: you only see what you have visited.</div>
       </div>
 
@@ -223,13 +223,9 @@ function Round({ event, name, diff, onAgain, onMenu }: {
       </div>
 
       <div className="stats">
-        {diff.showExactLoss ? (
-          <Stat label="Loss now" value={losses[losses.length - 1].toFixed(3)} />
-        ) : (
-          <Stat label="Last move" {...trend(losses)} />
-        )}
+        <Stat label="Loss now" value={losses[losses.length - 1].toFixed(3)} />
         <Stat label="Best" value={Number.isFinite(bestLoss) ? bestLoss.toFixed(3) : '—'} accent />
-        {diff.showGradientHint && <Stat label="‖∇L‖" value={hint.mag.toFixed(2)} />}
+        <Stat label="‖∇L‖" value={hint.mag.toFixed(2)} />
         {ls.fourD && <Stat label="w" value={cur[2].toFixed(2)} />}
       </div>
 
@@ -318,23 +314,13 @@ function Round({ event, name, diff, onAgain, onMenu }: {
   );
 }
 
-function Stat({ label, value, accent, tone }: { label: string; value: string; accent?: boolean; tone?: 'good' | 'bad' }) {
+function Stat({ label, value, accent }: { label: string; value: string; accent?: boolean }) {
   return (
-    <div className={`stat ${accent ? 'accent' : ''} ${tone ?? ''}`}>
+    <div className={`stat ${accent ? 'accent' : ''}`}>
       <span>{label}</span>
       <b>{value}</b>
     </div>
   );
-}
-
-/** Qualitative better/worse-than-last-shot readout, used in place of the exact loss number. */
-function trend(losses: number[]): { value: string; tone?: 'good' | 'bad' } {
-  if (losses.length < 2) return { value: '—' };
-  const d = losses[losses.length - 1] - losses[losses.length - 2];
-  const eps = 0.01;
-  if (d < -eps) return { value: '↓ Better', tone: 'good' };
-  if (d > eps) return { value: '↑ Worse', tone: 'bad' };
-  return { value: '≈ Flat' };
 }
 
 function Sparkline({ losses, lo, hi }: { losses: number[]; lo: number; hi: number }) {

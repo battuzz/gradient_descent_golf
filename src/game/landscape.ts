@@ -19,10 +19,6 @@ export interface Difficulty {
   vision: number;
   multiplier: number;
   autoAim: boolean;
-  /** Whether the on-screen −gradient arrow (and its ‖∇L‖ readout) is shown at all. */
-  showGradientHint: boolean;
-  /** Whether the exact "loss now" number is shown, vs. just a better/worse-than-last-shot cue. */
-  showExactLoss: boolean;
 }
 
 export const DIFFICULTIES: Difficulty[] = [
@@ -30,19 +26,16 @@ export const DIFFICULTIES: Difficulty[] = [
     id: 'easy', label: 'Batch GD', blurb: 'Smooth terrain, exact gradient, wide view.',
     shots: 8, fourD: false, decoys: 3, ripple: 0.03, gradNoise: 0, landNoise: 0,
     vision: 0.6, multiplier: 1, autoAim: true,
-    showGradientHint: true, showExactLoss: true,
   },
   {
-    id: 'medium', label: 'SGD', blurb: 'Bumpy terrain, no gradient arrow, narrower view.',
+    id: 'medium', label: 'SGD', blurb: 'Bumpy terrain, noisy gradient, narrower view.',
     shots: 7, fourD: false, decoys: 5, ripple: 0.11, gradNoise: 0.3, landNoise: 0.03,
     vision: 0.42, multiplier: 1.25, autoAim: false,
-    showGradientHint: false, showExactLoss: false,
   },
   {
-    id: 'hard', label: 'Hyper-SGD 4D', blurb: 'A hidden 4th dimension, no gradient arrow, tiny view.',
+    id: 'hard', label: 'Hyper-SGD 4D', blurb: 'A hidden 4th dimension, very noisy, tiny view.',
     shots: 7, fourD: true, decoys: 7, ripple: 0.16, gradNoise: 0.45, landNoise: 0.05,
     vision: 0.32, multiplier: 1.5, autoAim: false,
-    showGradientHint: false, showExactLoss: false,
   },
 ];
 
