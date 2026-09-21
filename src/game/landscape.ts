@@ -19,6 +19,12 @@ export interface Difficulty {
   vision: number;
   multiplier: number;
   autoAim: boolean;
+  /** Whether the exact ‖∇L‖ magnitude readout is shown (direction-only otherwise). */
+  showGradNorm: boolean;
+  /** Whether the per-shot loss trend graph is shown. */
+  showSparkline: boolean;
+  /** Decimal places shown on the loss/best readouts — coarser reads as "less telemetry". */
+  lossDecimals: number;
 }
 
 export const DIFFICULTIES: Difficulty[] = [
@@ -26,16 +32,19 @@ export const DIFFICULTIES: Difficulty[] = [
     id: 'easy', label: 'Batch GD', blurb: 'Smooth terrain, exact gradient, wide view.',
     shots: 8, fourD: false, decoys: 3, ripple: 0.03, gradNoise: 0, landNoise: 0,
     vision: 0.6, multiplier: 1, autoAim: true,
+    showGradNorm: true, showSparkline: true, lossDecimals: 3,
   },
   {
-    id: 'medium', label: 'SGD', blurb: 'Bumpy terrain, noisy gradient, narrower view.',
+    id: 'medium', label: 'SGD', blurb: 'Bumpy terrain, noisy gradient, narrower view, less telemetry.',
     shots: 7, fourD: false, decoys: 5, ripple: 0.11, gradNoise: 0.3, landNoise: 0.03,
     vision: 0.42, multiplier: 1.25, autoAim: false,
+    showGradNorm: false, showSparkline: false, lossDecimals: 2,
   },
   {
-    id: 'hard', label: 'Hyper-SGD 4D', blurb: 'A hidden 4th dimension, very noisy, tiny view.',
+    id: 'hard', label: 'Hyper-SGD 4D', blurb: 'A hidden 4th dimension, very noisy, tiny view, least telemetry.',
     shots: 7, fourD: true, decoys: 7, ripple: 0.16, gradNoise: 0.45, landNoise: 0.05,
     vision: 0.32, multiplier: 1.5, autoAim: false,
+    showGradNorm: false, showSparkline: false, lossDecimals: 2,
   },
 ];
 
