@@ -216,7 +216,7 @@ function Round({ event, name, diff, onAgain, onMenu }: {
       <GameCanvas
         ls={ls}
         diff={diff}
-        z={cur[2]}
+        z={done ? cur[2] : wTarget}
         path={path}
         losses={losses}
         reveals={reveals}

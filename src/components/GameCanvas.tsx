@@ -152,6 +152,8 @@ export function GameCanvas(props: Props) {
       }
       const bx = px(ball[0]);
       const by = py(ball[1]);
+      // true when the slice being painted (from the w-slider) isn't the ball's own slice
+      const previewing = p.ls.fourD && !p.revealAll && Math.abs(p.z - ball[2]) > 0.02;
 
       // trail
       ctx.lineJoin = 'round';
@@ -259,7 +261,8 @@ export function GameCanvas(props: Props) {
         }
       }
 
-      // ball
+      // ball — dimmed to a ghost while previewing a different w-slice than it actually sits on
+      ctx.globalAlpha = previewing ? 0.35 : 1;
       const grd = ctx.createRadialGradient(bx, by, 2, bx, by, 22);
       grd.addColorStop(0, 'rgba(255,255,255,0.55)');
       grd.addColorStop(1, 'rgba(255,255,255,0)');
@@ -269,6 +272,24 @@ export function GameCanvas(props: Props) {
       ctx.strokeStyle = '#0b1220';
       ctx.lineWidth = 2.5;
       ctx.beginPath(); ctx.arc(bx, by, 8, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+      ctx.globalAlpha = 1;
+
+      // preview badge: makes it unmistakable that the terrain shown is a different w-slice
+      if (previewing) {
+        const label = `previewing w = ${p.z.toFixed(2)}`;
+        ctx.font = '700 12px system-ui, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        const lw = ctx.measureText(label).width + 20;
+        const lx = S / 2;
+        const ly = 20;
+        ctx.fillStyle = 'rgba(90,209,255,0.16)';
+        ctx.strokeStyle = 'rgba(90,209,255,0.9)';
+        ctx.lineWidth = 1.5;
+        ctx.beginPath(); ctx.roundRect(lx - lw / 2, ly - 13, lw, 26, 13); ctx.fill(); ctx.stroke();
+        ctx.fillStyle = '#5ad1ff';
+        ctx.fillText(label, lx, ly + 1);
+      }
     };
     raf = requestAnimationFrame(draw);
     return () => cancelAnimationFrame(raf);
