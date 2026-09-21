@@ -1,0 +1,23 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /scores/{id} {
+      allow read: if true;
+      allow create: if request.resource.data.keys().hasOnly(
+                         ['name', 'points', 'loss', 'difficulty', 'event', 'shots', 'createdAt'])
+                    && request.resource.data.name is string
+                    && request.resource.data.name.size() > 0
+                    && request.resource.data.name.size() <= 20
+                    && request.resource.data.points is number
+                    && request.resource.data.points >= 0
+                    && request.resource.data.points <= 1500
+                    && request.resource.data.loss is number
+                    && request.resource.data.difficulty in ['easy', 'medium', 'hard']
+                    && request.resource.data.event is string
+                    && request.resource.data.event.size() <= 40
+                    && request.resource.data.shots is number
+                    && request.resource.data.createdAt == request.time;
+      allow update, delete: if false;
+    }
+  }
+}
