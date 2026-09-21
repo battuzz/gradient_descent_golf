@@ -47,9 +47,11 @@ export function GameCanvas(props: Props) {
     }
     const octx = off.getContext('2d')!;
     const img = octx.createImageData(RES, RES);
-    paintHeat(img, props.ls, props.z, props.reveals, props.diff.vision, props.revealAll);
+    // the finished round always reveals cleanly (no stippling) so the recap map reads well
+    const pixelSample = props.revealAll ? 1 : props.diff.pixelSample;
+    paintHeat(img, props.ls, props.z, props.reveals, props.diff.vision, props.revealAll, pixelSample);
     octx.putImageData(img, 0, 0);
-  }, [props.ls, props.z, props.reveals, props.diff.vision, props.revealAll]);
+  }, [props.ls, props.z, props.reveals, props.diff.vision, props.diff.pixelSample, props.revealAll]);
 
   // ----- sizing
   useEffect(() => {

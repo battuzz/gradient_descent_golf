@@ -17,6 +17,9 @@ export interface Difficulty {
   landNoise: number;
   /** Radius of the region revealed around every visited point. */
   vision: number;
+  /** Fraction of pixels inside the revealed radius that are actually painted (1 = a solid patch,
+   *  lower = a sparse, speckled reveal that shows only scattered samples of the true terrain). */
+  pixelSample: number;
   multiplier: number;
   autoAim: boolean;
 }
@@ -25,17 +28,17 @@ export const DIFFICULTIES: Difficulty[] = [
   {
     id: 'easy', label: 'Batch GD', blurb: 'Smooth terrain, exact gradient, wide view.',
     shots: 8, fourD: false, decoys: 3, ripple: 0.03, gradNoise: 0, landNoise: 0,
-    vision: 0.6, multiplier: 1, autoAim: true,
+    vision: 0.6, pixelSample: 1, multiplier: 1, autoAim: true,
   },
   {
-    id: 'medium', label: 'SGD', blurb: 'Bumpy terrain, noisy gradient, narrower view.',
+    id: 'medium', label: 'SGD', blurb: 'Bumpy terrain, noisy gradient, half the view, speckled.',
     shots: 7, fourD: false, decoys: 5, ripple: 0.11, gradNoise: 0.3, landNoise: 0.03,
-    vision: 0.42, multiplier: 1.25, autoAim: false,
+    vision: 0.21, pixelSample: 0.5, multiplier: 1.25, autoAim: false,
   },
   {
-    id: 'hard', label: 'Hyper-SGD 4D', blurb: 'A hidden 4th dimension, very noisy, tiny view.',
+    id: 'hard', label: 'Hyper-SGD 4D', blurb: 'A hidden 4th dimension, tiny and sparsely-sampled view.',
     shots: 7, fourD: true, decoys: 7, ripple: 0.16, gradNoise: 0.45, landNoise: 0.05,
-    vision: 0.32, multiplier: 1.5, autoAim: false,
+    vision: 0.16, pixelSample: 0.3, multiplier: 1.5, autoAim: false,
   },
 ];
 
@@ -84,10 +87,13 @@ export interface Landscape {
   lo: number;
   hi: number;
   median: number;
+  /** stable per-round seed, used to make the stippled fog-reveal pattern deterministic */
+  seedHash: number;
 }
 
 export function buildLandscape(seed: string, d: Difficulty): Landscape {
-  const r = rng(hashString(seed));
+  const seedHash = hashString(seed);
+  const r = rng(seedHash);
   const fourD = d.fourD;
   const rp = (m: number) => (r() * 2 - 1) * m;
 
@@ -187,7 +193,7 @@ export function buildLandscape(seed: string, d: Difficulty): Landscape {
     }
   }
 
-  return { fourD, loss, grad, start, best, lo: bestV, hi, median };
+  return { fourD, loss, grad, start, best, lo: bestV, hi, median, seedHash };
 }
 
 /**

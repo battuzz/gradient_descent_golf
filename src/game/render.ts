@@ -32,9 +32,20 @@ export function lossColor(ls: Landscape, v: number): string {
 const FOG: [number, number, number] = [13, 19, 32];
 const W_SIGMA = 0.32;
 
+/** Deterministic (seed, i, j) → [0, 1) pseudo-random value, stable across repaints. */
+function pixelRand(seed: number, i: number, j: number): number {
+  let h = (seed ^ Math.imul(i, 374761393) ^ Math.imul(j, 668265263)) >>> 0;
+  h = Math.imul(h ^ (h >>> 15), 2246822519);
+  h = Math.imul(h ^ (h >>> 13), 3266489917);
+  h = (h ^ (h >>> 16)) >>> 0;
+  return h / 4294967296;
+}
+
 /**
  * Paints the loss slice at height `z` into `img`. Only regions near already-visited points
- * (the "fog of war") show their real colours, unless `revealAll` is set.
+ * (the "fog of war") show their real colours, unless `revealAll` is set. `pixelSample` < 1
+ * additionally keeps only a random fraction of those pixels — a sparse, speckled reveal
+ * instead of a solid patch — so higher difficulties give you scattered samples, not the map.
  */
 export function paintHeat(
   img: ImageData,
@@ -43,6 +54,7 @@ export function paintHeat(
   reveals: Vec3[],
   vision: number,
   revealAll: boolean,
+  pixelSample: number,
 ): void {
   const d = img.data;
   const span = ls.hi - ls.lo;
@@ -67,6 +79,7 @@ export function paintHeat(
           }
           if (w > a) a = w;
         }
+        if (a > 0.01 && pixelSample < 1 && pixelRand(ls.seedHash, i, j) >= pixelSample) a = 0;
       }
       const o = (j * RES + i) * 4;
       if (a <= 0.01) {
