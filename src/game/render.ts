@@ -3,33 +3,86 @@ import type { Landscape, Vec3 } from './landscape';
 /** Resolution of the offscreen heat-map (it is up-scaled smoothly on the visible canvas). */
 export const RES = 140;
 
-const STOPS: [number, [number, number, number]][] = [
-  [0.0, [190, 255, 90]],
-  [0.22, [30, 215, 160]],
-  [0.5, [40, 125, 215]],
-  [0.78, [95, 60, 185]],
-  [1.0, [38, 14, 72]],
-];
+export type PaletteId = 'sunset' | 'viridis' | 'cividis' | 'iceFire';
 
-function palette(t: number): [number, number, number] {
+interface PaletteDef {
+  name: string;
+  /** short line describing who/what it's tuned for */
+  blurb: string;
+  /** t=0 → best/lowest loss (bright), t=1 → worst/highest loss (dark, blends into the fog) */
+  stops: [number, [number, number, number]][];
+}
+
+export const PALETTES: Record<PaletteId, PaletteDef> = {
+  sunset: {
+    name: 'Sunset', blurb: 'Default — high-contrast, most colourful',
+    stops: [
+      [0.0, [214, 255, 56]],
+      [0.18, [0, 224, 150]],
+      [0.45, [0, 149, 255]],
+      [0.72, [130, 40, 220]],
+      [1.0, [22, 7, 46]],
+    ],
+  },
+  viridis: {
+    name: 'Viridis', blurb: 'Colour-blind friendly (red-green safe)',
+    stops: [
+      [0.0, [253, 231, 37]],
+      [0.25, [94, 201, 98]],
+      [0.5, [33, 145, 140]],
+      [0.75, [59, 82, 139]],
+      [1.0, [68, 1, 84]],
+    ],
+  },
+  cividis: {
+    name: 'Cividis', blurb: 'Optimised for colour vision deficiency',
+    stops: [
+      [0.0, [255, 234, 70]],
+      [0.35, [184, 171, 91]],
+      [0.65, [123, 123, 122]],
+      [0.85, [65, 79, 107]],
+      [1.0, [0, 32, 77]],
+    ],
+  },
+  iceFire: {
+    name: 'Ice & Fire', blurb: 'Blue/orange — max contrast, no red-green',
+    stops: [
+      [0.0, [255, 179, 71]],
+      [0.32, [255, 240, 200]],
+      [0.55, [173, 216, 255]],
+      [0.8, [60, 110, 200]],
+      [1.0, [17, 26, 58]],
+    ],
+  },
+};
+
+export const PALETTE_IDS: PaletteId[] = ['sunset', 'viridis', 'cividis', 'iceFire'];
+
+function palette(stops: [number, [number, number, number]][], t: number): [number, number, number] {
   t = t < 0 ? 0 : t > 1 ? 1 : t;
-  for (let i = 1; i < STOPS.length; i++) {
-    if (t <= STOPS[i][0]) {
-      const [t0, c0] = STOPS[i - 1];
-      const [t1, c1] = STOPS[i];
+  for (let i = 1; i < stops.length; i++) {
+    if (t <= stops[i][0]) {
+      const [t0, c0] = stops[i - 1];
+      const [t1, c1] = stops[i];
       const f = (t - t0) / (t1 - t0);
       return [c0[0] + (c1[0] - c0[0]) * f, c0[1] + (c1[1] - c0[1]) * f, c0[2] + (c1[2] - c0[2]) * f];
     }
   }
-  return STOPS[STOPS.length - 1][1];
+  return stops[stops.length - 1][1];
 }
 
-export function lossColor(ls: Landscape, v: number): string {
-  const [r, g, b] = palette((v - ls.lo) / (ls.hi - ls.lo));
+/** CSS gradient string for a small swatch preview in the theme picker. */
+export function paletteSwatchCss(id: PaletteId): string {
+  const parts = PALETTES[id].stops.map(([t, [r, g, b]]) => `rgb(${r},${g},${b}) ${Math.round(t * 100)}%`);
+  return `linear-gradient(90deg, ${parts.join(', ')})`;
+}
+
+export function lossColor(ls: Landscape, v: number, theme: PaletteId): string {
+  const [r, g, b] = palette(PALETTES[theme].stops, (v - ls.lo) / (ls.hi - ls.lo));
   return `rgb(${r | 0},${g | 0},${b | 0})`;
 }
 
-const FOG: [number, number, number] = [13, 19, 32];
+const FOG: [number, number, number] = [9, 13, 24];
 const W_SIGMA = 0.32;
 
 /** Deterministic (seed, i, j) → [0, 1) pseudo-random value, stable across repaints. */
@@ -55,8 +108,10 @@ export function paintHeat(
   vision: number,
   revealAll: boolean,
   pixelSample: number,
+  theme: PaletteId,
 ): void {
   const d = img.data;
+  const stops = PALETTES[theme].stops;
   const span = ls.hi - ls.lo;
   const inner = vision * 0.55;
   for (let j = 0; j < RES; j++) {
@@ -88,11 +143,11 @@ export function paintHeat(
       }
       const v = ls.loss(x, y, z);
       const t = (v - ls.lo) / span;
-      const [r, g, b] = palette(t);
-      // contour lines
+      const [r, g, b] = palette(stops, t);
+      // contour lines — darkened harder than the base palette for a punchier, more legible relief
       const band = t * 16;
       const line = Math.abs(band - Math.round(band));
-      const shade = line < 0.07 ? 0.72 : 1;
+      const shade = line < 0.07 ? 0.55 : 1;
       a = a * a * (3 - 2 * a);
       d[o] = FOG[0] + (r * shade - FOG[0]) * a;
       d[o + 1] = FOG[1] + (g * shade - FOG[1]) * a;

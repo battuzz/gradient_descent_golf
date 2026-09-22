@@ -4,19 +4,33 @@ import {
   type Difficulty, type Vec3,
 } from '../game/landscape';
 import { GameCanvas, type Flight } from './GameCanvas';
+import { PALETTE_IDS, PALETTES, paletteSwatchCss, type PaletteId } from '../game/render';
 import { fetchScores, rank, submitScore, usingFirebase } from '../lib/scores';
 import { navigate } from '../lib/route';
 
 const NAME_KEY = 'gdg.name';
 const TUTORIAL_KEY = 'gdg.tutorialSeen';
+const THEME_KEY = 'gdg.theme';
 const W_STEP = 0.5; // max change of the 4th parameter per shot
 
 const clamp = (v: number, a: number, b: number) => Math.min(b, Math.max(a, v));
+
+const isPaletteId = (v: string | null): v is PaletteId => !!v && (PALETTE_IDS as string[]).includes(v);
 
 export function Game({ event }: { event: string }) {
   const [name, setName] = useState(() => localStorage.getItem(NAME_KEY) ?? '');
   const [diffId, setDiffId] = useState<Difficulty['id'] | null>(null);
   const [round, setRound] = useState(0);
+  const [theme, setTheme] = useState<PaletteId>(() => {
+    try {
+      const v = localStorage.getItem(THEME_KEY);
+      return isPaletteId(v) ? v : 'sunset';
+    } catch { return 'sunset'; }
+  });
+  const changeTheme = (t: PaletteId) => {
+    setTheme(t);
+    try { localStorage.setItem(THEME_KEY, t); } catch { /* ignore */ }
+  };
 
   if (!diffId) {
     return (
@@ -37,6 +51,8 @@ export function Game({ event }: { event: string }) {
       event={event}
       name={name.trim()}
       diff={getDifficulty(diffId)}
+      theme={theme}
+      onThemeChange={changeTheme}
       onAgain={() => setRound((r) => r + 1)}
       onMenu={() => setDiffId(null)}
     />
@@ -125,10 +141,42 @@ function TutorialOverlay({ step, onNext, onSkip }: { step: number; onNext: () =>
   );
 }
 
+/** Lets players swap the heat-map colour scale for one that suits their colour vision. */
+function ThemePicker({ theme, onChange }: { theme: PaletteId; onChange: (t: PaletteId) => void }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="theme-picker">
+      <button className="icon-btn" onClick={() => setOpen((o) => !o)} aria-label="Change heat-map colours">🎨</button>
+      {open && (
+        <>
+          <div className="theme-backdrop" onClick={() => setOpen(false)} />
+          <div className="theme-menu" role="menu">
+            {PALETTE_IDS.map((id) => (
+              <button
+                key={id}
+                className={`theme-option ${id === theme ? 'active' : ''}`}
+                onClick={() => { onChange(id); setOpen(false); }}
+              >
+                <span className="theme-swatch" style={{ background: paletteSwatchCss(id) }} />
+                <span className="theme-option-text">
+                  <b>{PALETTES[id].name}</b>
+                  <span className="muted small">{PALETTES[id].blurb}</span>
+                </span>
+                {id === theme && <span className="theme-check">✓</span>}
+              </button>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
 // ---------------------------------------------------------------- round
 
-function Round({ event, name, diff, onAgain, onMenu }: {
-  event: string; name: string; diff: Difficulty; onAgain: () => void; onMenu: () => void;
+function Round({ event, name, diff, theme, onThemeChange, onAgain, onMenu }: {
+  event: string; name: string; diff: Difficulty; theme: PaletteId; onThemeChange: (t: PaletteId) => void;
+  onAgain: () => void; onMenu: () => void;
 }) {
   const seed = `${event}:${diff.id}`;
   const ls = useMemo(() => buildLandscape(seed, diff), [seed, diff]);
@@ -260,6 +308,7 @@ function Round({ event, name, diff, onAgain, onMenu }: {
             <i key={i} className={i < shotsTaken ? 'used' : ''} />
           ))}
         </div>
+        <ThemePicker theme={theme} onChange={onThemeChange} />
       </div>
 
       <div className="stats">
@@ -272,6 +321,7 @@ function Round({ event, name, diff, onAgain, onMenu }: {
       <GameCanvas
         ls={ls}
         diff={diff}
+        theme={theme}
         z={done ? cur[2] : wTarget}
         path={path}
         losses={losses}

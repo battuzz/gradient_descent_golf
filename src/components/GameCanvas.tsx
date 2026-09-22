@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 import type { Difficulty, Landscape, Vec3 } from '../game/landscape';
-import { lossColor, paintHeat, RES } from '../game/render';
+import { lossColor, paintHeat, RES, type PaletteId } from '../game/render';
 
 export const MAX_STEP = 0.8; // world units of a full-power (lr = 1) shot
 const FLIGHT_MS = 750;
@@ -11,6 +11,7 @@ export interface Flight { from: Vec3; to: Vec3; t0: number }
 interface Props {
   ls: Landscape;
   diff: Difficulty;
+  theme: PaletteId;
   z: number;
   path: Vec3[];
   losses: number[];
@@ -49,9 +50,9 @@ export function GameCanvas(props: Props) {
     const img = octx.createImageData(RES, RES);
     // the finished round always reveals cleanly (no stippling) so the recap map reads well
     const pixelSample = props.revealAll ? 1 : props.diff.pixelSample;
-    paintHeat(img, props.ls, props.z, props.reveals, props.diff.vision, props.revealAll, pixelSample);
+    paintHeat(img, props.ls, props.z, props.reveals, props.diff.vision, props.revealAll, pixelSample, props.theme);
     octx.putImageData(img, 0, 0);
-  }, [props.ls, props.z, props.reveals, props.diff.vision, props.diff.pixelSample, props.revealAll]);
+  }, [props.ls, props.z, props.reveals, props.diff.vision, props.diff.pixelSample, props.revealAll, props.theme]);
 
   // ----- sizing
   useEffect(() => {
@@ -175,7 +176,7 @@ export function GameCanvas(props: Props) {
         const y = py(v[1]);
         ctx.beginPath();
         ctx.arc(x, y, 9, 0, Math.PI * 2);
-        ctx.fillStyle = lossColor(p.ls, p.losses[i]);
+        ctx.fillStyle = lossColor(p.ls, p.losses[i], p.theme);
         ctx.fill();
         ctx.lineWidth = 2;
         ctx.strokeStyle = '#fff';

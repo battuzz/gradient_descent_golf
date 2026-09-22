@@ -92,6 +92,24 @@ h1 { font-size: 22px; margin: 8px 0 4px; letter-spacing: -0.02em; }
 .shots i { width: 9px; height: 9px; border-radius: 50%; background: var(--accent); display: block; }
 .shots i.used { background: #2a3549; }
 
+.theme-picker { position: relative; }
+.theme-backdrop { position: fixed; inset: 0; z-index: 39; }
+.theme-menu {
+  position: absolute; top: 46px; right: 0; z-index: 40; width: 240px;
+  background: var(--panel-solid); border: 1px solid var(--border); border-radius: 14px;
+  padding: 6px; display: flex; flex-direction: column; gap: 2px;
+  box-shadow: 0 12px 32px rgba(0,0,0,0.45);
+}
+.theme-option {
+  display: flex; align-items: center; gap: 10px; background: none; border: none; border-radius: 10px;
+  padding: 8px; cursor: pointer; text-align: left; color: var(--text);
+}
+.theme-option:hover, .theme-option.active { background: #17253f; }
+.theme-swatch { width: 30px; height: 20px; border-radius: 5px; flex: none; border: 1px solid rgba(255,255,255,0.15); }
+.theme-option-text { display: flex; flex-direction: column; flex: 1; gap: 1px; }
+.theme-option-text b { font-size: 13px; }
+.theme-check { color: var(--accent); font-weight: 700; }
+
 .stats { display: grid; grid-auto-flow: column; gap: 8px; }
 .stat {
   background: var(--panel-solid); border: 1px solid var(--border); border-radius: 12px;
