@@ -13,6 +13,7 @@ const NAME_KEY = 'gdg.name';
 const TUTORIAL_KEY = 'gdg.tutorialSeen';
 const FOURD_KEY = 'gdg.tutorial4dSeen';
 const THEME_KEY = 'gdg.theme';
+const VIEW3D_KEY = 'gdg.view3d';
 const W_STEP = 0.5; // max change of the 4th parameter per shot
 
 const clamp = (v: number, a: number, b: number) => Math.min(b, Math.max(a, v));
@@ -32,6 +33,13 @@ export function Game({ event }: { event: string }) {
   const changeTheme = (t: PaletteId) => {
     setTheme(t);
     try { localStorage.setItem(THEME_KEY, t); } catch { /* ignore */ }
+  };
+  const [view3d, setView3d] = useState<boolean>(() => {
+    try { return localStorage.getItem(VIEW3D_KEY) === '1'; } catch { return false; }
+  });
+  const changeView3d = (v: boolean) => {
+    setView3d(v);
+    try { localStorage.setItem(VIEW3D_KEY, v ? '1' : '0'); } catch { /* ignore */ }
   };
 
   if (!diffId) {
@@ -55,6 +63,8 @@ export function Game({ event }: { event: string }) {
       diff={getDifficulty(diffId)}
       theme={theme}
       onThemeChange={changeTheme}
+      view3d={view3d}
+      onView3DChange={changeView3d}
       onAgain={() => setRound((r) => r + 1)}
       onMenu={() => setDiffId(null)}
     />
@@ -236,8 +246,9 @@ function ThemePicker({ theme, onChange }: { theme: PaletteId; onChange: (t: Pale
 
 // ---------------------------------------------------------------- round
 
-function Round({ event, name, diff, theme, onThemeChange, onAgain, onMenu }: {
+function Round({ event, name, diff, theme, onThemeChange, view3d, onView3DChange, onAgain, onMenu }: {
   event: string; name: string; diff: Difficulty; theme: PaletteId; onThemeChange: (t: PaletteId) => void;
+  view3d: boolean; onView3DChange: (v: boolean) => void;
   onAgain: () => void; onMenu: () => void;
 }) {
   const { t } = useLang();
@@ -398,6 +409,14 @@ function Round({ event, name, diff, theme, onThemeChange, onAgain, onMenu }: {
             <i key={i} className={i < shotsTaken ? 'used' : ''} />
           ))}
         </div>
+        <button
+          className="icon-btn"
+          onClick={() => onView3DChange(!view3d)}
+          aria-label={t.toggle3DAria}
+          aria-pressed={view3d}
+        >
+          {view3d ? '🗻' : '🗺️'}
+        </button>
         <ThemePicker theme={theme} onChange={onThemeChange} />
       </div>
 
@@ -423,6 +442,7 @@ function Round({ event, name, diff, theme, onThemeChange, onAgain, onMenu }: {
           autoAim={autoAim}
           disabled={done || blocked}
           revealAll={done}
+          view3d={view3d}
           onShoot={onShoot}
           onLand={onLand}
         />
