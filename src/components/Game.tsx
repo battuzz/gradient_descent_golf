@@ -7,6 +7,7 @@ import { GameCanvas, type Flight } from './GameCanvas';
 import { PALETTE_IDS, PALETTES, paletteSwatchCss, type PaletteId } from '../game/render';
 import { fetchScores, rank, submitScore, usingFirebase } from '../lib/scores';
 import { navigate } from '../lib/route';
+import { useLang, type Dict } from '../lib/i18n';
 
 const NAME_KEY = 'gdg.name';
 const TUTORIAL_KEY = 'gdg.tutorialSeen';
@@ -68,24 +69,22 @@ function Setup(props: {
   setName: (s: string) => void;
   onStart: (d: Difficulty['id']) => void;
 }) {
+  const { t } = useLang();
   const ok = props.name.trim().length > 0;
   return (
     <div className="page setup">
       <header className="setup-head">
         <div className="logo">⛳</div>
         <h1>Gradient Descent Golf</h1>
-        <p className="lead">
-          You are the optimizer. Roll the ball downhill on a hidden loss landscape and find the deepest valley
-          before you run out of steps.
-        </p>
+        <p className="lead">{t.setupLead}</p>
       </header>
 
       <label className="field">
-        <span>Your name</span>
+        <span>{t.yourName}</span>
         <input
           value={props.name}
           maxLength={20}
-          placeholder="e.g. Ada Lovelace"
+          placeholder={t.namePlaceholder}
           autoComplete="off"
           onChange={(e) => props.setName(e.target.value)}
         />
@@ -98,17 +97,17 @@ function Setup(props: {
               <b>{d.label}</b>
               <span className="mult">×{d.multiplier}</span>
             </div>
-            <div className="diff-blurb">{d.blurb}</div>
-            <div className="diff-meta">{d.shots} shots{d.fourD ? ' · 4D' : ' · 3D'}</div>
+            <div className="diff-blurb">{t.diffBlurb[d.id]}</div>
+            <div className="diff-meta">{t.shotsCount(d.shots)} · {d.fourD ? '4D' : '3D'}</div>
           </button>
         ))}
       </div>
-      {!ok && <p className="muted center">Enter a name to pick a difficulty</p>}
+      {!ok && <p className="muted center">{t.enterNameToPick}</p>}
       <div className="row gap-sm center">
         <button className="link" onClick={() => { try { localStorage.removeItem(TUTORIAL_KEY); } catch { /* ignore */ } }}>
-          ❔ Show tips next round
+          {t.showTipsNextRound}
         </button>
-        <button className="link" onClick={() => navigate('/', props.event)}>View leaderboard →</button>
+        <button className="link" onClick={() => navigate('/', props.event)}>{t.viewLeaderboard}</button>
       </div>
     </div>
   );
@@ -119,33 +118,26 @@ function Setup(props: {
  * then the player takes the shot it just taught them, then the next card appears. Tip 1
  * additionally renders a live colour-scale legend for the current theme.
  */
-const TUTORIAL_TIPS: { icon: string; text: string; also?: string; note?: string; legend?: boolean }[] = [
-  { icon: '🖱️', text: 'Drag on the map to shoot — how far you drag sets the learning rate.' },
-  {
-    icon: '🎯', legend: true,
-    text: "This is the loss. Bright means good, dark means bad — aim for the brightest colour, that's the minimum!",
-    note: 'You can customize the theme with the 🎨 in the top right.',
-  },
-  {
-    icon: '➤',
-    text: 'Follow the pulsing yellow arrow: the (noisy) −gradient, your best guess at downhill.',
-    also: 'Prefer to aim it yourself? Turn off Auto-aim.',
-  },
-  {
-    icon: '🌫️',
-    text: "Your information is limited — fog hides everything you haven't explored. Roam around to find the minimum!",
-  },
-];
+function tutorialTips(t: Dict): { icon: string; text: string; also?: string; note?: string; legend?: boolean }[] {
+  return [
+    { icon: '🖱️', text: t.tipDrag },
+    { icon: '🎯', legend: true, text: t.tipLegend, note: t.tipLegendNote },
+    { icon: '➤', text: t.tipArrow, also: t.tipArrowAlso },
+    { icon: '🌫️', text: t.tipFog },
+  ];
+}
 
 function TutorialOverlay({
   step, theme, onNext, onSkip,
 }: { step: number; theme: PaletteId; onNext: () => void; onSkip: () => void }) {
-  const tip = TUTORIAL_TIPS[step];
-  const last = step === TUTORIAL_TIPS.length - 1;
+  const { t } = useLang();
+  const tips = tutorialTips(t);
+  const tip = tips[step];
+  const last = step === tips.length - 1;
   return (
     <div className="tip-backdrop" role="dialog" aria-modal="true">
       <div className="tip-card">
-        <button className="tip-skip" onClick={onSkip} aria-label="Skip tips">✕</button>
+        <button className="tip-skip" onClick={onSkip} aria-label={t.tipSkipAria}>✕</button>
         <span className="tip-card-icon">{tip.icon}</span>
         <p className="tip-card-text">{tip.text}</p>
         {tip.also && <p className="tip-card-text">{tip.also}</p>}
@@ -154,17 +146,17 @@ function TutorialOverlay({
           <div className="tip-legend">
             <div className="tip-legend-bar" style={{ background: paletteSwatchCss(theme) }} />
             <div className="tip-legend-labels">
-              <span className="good">★ minimum</span>
-              <span className="bad">high loss</span>
+              <span className="good">{t.legendMin}</span>
+              <span className="bad">{t.legendMax}</span>
             </div>
           </div>
         )}
         <div className="tip-dots">
-          {TUTORIAL_TIPS.map((_, i) => (
+          {tips.map((_, i) => (
             <span key={i} className={i === step ? 'on' : ''} />
           ))}
         </div>
-        <button className="btn primary" onClick={onNext}>{last ? "Got it — let's golf" : 'Next'}</button>
+        <button className="btn primary" onClick={onNext}>{last ? t.tipGotIt : t.tipNext}</button>
       </div>
     </div>
   );
@@ -172,19 +164,15 @@ function TutorialOverlay({
 
 /** One-off, shown the first time a player opens a 4D difficulty — explains the w-slider. */
 function FourDIntro({ onDismiss }: { onDismiss: () => void }) {
+  const { t } = useLang();
   return (
     <div className="tip-backdrop" role="dialog" aria-modal="true">
       <div className="tip-card">
-        <button className="tip-skip" onClick={onDismiss} aria-label="Dismiss">✕</button>
+        <button className="tip-skip" onClick={onDismiss} aria-label={t.dismissAria}>✕</button>
         <span className="tip-card-icon">🎚️</span>
-        <p className="tip-card-text">
-          This level hides a 4th dimension, <b>w</b>. Drag the slider below the map to choose where you'll land
-          along it.
-        </p>
-        <p className="tip-card-text">
-          The white mark shows where you are now; the yellow mark shows where the gradient suggests moving.
-        </p>
-        <button className="btn primary" onClick={onDismiss}>Got it</button>
+        <p className="tip-card-text">{t.fourDPart1a} <b>w</b>{t.fourDPart1b}</p>
+        <p className="tip-card-text">{t.fourDPart2}</p>
+        <button className="btn primary" onClick={onDismiss}>{t.fourDGotIt}</button>
       </div>
     </div>
   );
@@ -193,6 +181,7 @@ function FourDIntro({ onDismiss }: { onDismiss: () => void }) {
 /** Persistent legend beside the map: which colour is the minimum, which is the worst, and the
  *  actual loss values at each end — so the heat-map never has to be read by memory alone. */
 function ColorBar({ theme, lo, hi }: { theme: PaletteId; lo: number; hi: number }) {
+  const { t } = useLang();
   return (
     <div className="color-bar">
       <div className="color-bar-end">
@@ -203,7 +192,7 @@ function ColorBar({ theme, lo, hi }: { theme: PaletteId; lo: number; hi: number 
         className="color-bar-track"
         style={{ background: paletteSwatchCss(theme, 0) }}
         role="img"
-        aria-label="Colour scale from highest loss (worst) at the top to lowest loss (best) at the bottom"
+        aria-label={t.colorBarAria}
       />
       <div className="color-bar-end">
         <span className="color-bar-tag">min</span>
@@ -215,10 +204,11 @@ function ColorBar({ theme, lo, hi }: { theme: PaletteId; lo: number; hi: number 
 
 /** Lets players swap the heat-map colour scale for one that suits their colour vision. */
 function ThemePicker({ theme, onChange }: { theme: PaletteId; onChange: (t: PaletteId) => void }) {
+  const { t } = useLang();
   const [open, setOpen] = useState(false);
   return (
     <div className="theme-picker">
-      <button className="icon-btn" onClick={() => setOpen((o) => !o)} aria-label="Change heat-map colours">🎨</button>
+      <button className="icon-btn" onClick={() => setOpen((o) => !o)} aria-label={t.changeColoursAria}>🎨</button>
       {open && (
         <>
           <div className="theme-backdrop" onClick={() => setOpen(false)} />
@@ -232,7 +222,7 @@ function ThemePicker({ theme, onChange }: { theme: PaletteId; onChange: (t: Pale
                 <span className="theme-swatch" style={{ background: paletteSwatchCss(id) }} />
                 <span className="theme-option-text">
                   <b>{PALETTES[id].name}</b>
-                  <span className="muted small">{PALETTES[id].blurb}</span>
+                  <span className="muted small">{t.paletteBlurb[id]}</span>
                 </span>
                 {id === theme && <span className="theme-check">✓</span>}
               </button>
@@ -250,6 +240,7 @@ function Round({ event, name, diff, theme, onThemeChange, onAgain, onMenu }: {
   event: string; name: string; diff: Difficulty; theme: PaletteId; onThemeChange: (t: PaletteId) => void;
   onAgain: () => void; onMenu: () => void;
 }) {
+  const { t } = useLang();
   const seed = `${event}:${diff.id}`;
   const ls = useMemo(() => buildLandscape(seed, diff), [seed, diff]);
 
@@ -284,16 +275,16 @@ function Round({ event, name, diff, theme, onThemeChange, onAgain, onMenu }: {
 
   const shotsTaken = path.length - 1;
   const done = (shotsTaken >= diff.shots || earlyStop) && !flight;
-  const tipShowing =
-    !fourDPending && !tutorialSeen && !done && dismissedCount < TUTORIAL_TIPS.length && shotsTaken === dismissedCount;
+  const TIP_COUNT = 4;
+  const tipShowing = !fourDPending && !tutorialSeen && !done && dismissedCount < TIP_COUNT && shotsTaken === dismissedCount;
   const blocked = fourDPending || tipShowing;
   const nextTip = () => {
     const n = dismissedCount + 1;
     setDismissedCount(n);
-    if (n >= TUTORIAL_TIPS.length) dismissTutorial();
+    if (n >= TIP_COUNT) dismissTutorial();
   };
   const skipTutorial = () => {
-    setDismissedCount(TUTORIAL_TIPS.length);
+    setDismissedCount(TIP_COUNT);
     dismissTutorial();
   };
   // safety net: if the round ends mid-tutorial (e.g. an early finish), don't leave it dangling
@@ -397,12 +388,12 @@ function Round({ event, name, diff, theme, onThemeChange, onAgain, onMenu }: {
   return (
     <div className="page play">
       <div className="topbar">
-        <button className="icon-btn" onClick={onMenu} aria-label="Back">←</button>
+        <button className="icon-btn" onClick={onMenu} aria-label={t.backAria}>←</button>
         <div className="title">
           <b>{diff.label}</b>
           <span className="muted">{name}</span>
         </div>
-        <div className="shots" aria-label={`${diff.shots - shotsTaken} shots left`}>
+        <div className="shots" aria-label={t.shotsLeftAria(diff.shots - shotsTaken)}>
           {Array.from({ length: diff.shots }, (_, i) => (
             <i key={i} className={i < shotsTaken ? 'used' : ''} />
           ))}
@@ -411,8 +402,8 @@ function Round({ event, name, diff, theme, onThemeChange, onAgain, onMenu }: {
       </div>
 
       <div className="stats">
-        <Stat label="Loss now" value={losses[losses.length - 1].toFixed(3)} />
-        <Stat label="Best" value={Number.isFinite(bestLoss) ? bestLoss.toFixed(3) : '—'} accent />
+        <Stat label={t.statLossNow} value={losses[losses.length - 1].toFixed(3)} />
+        <Stat label={t.statBest} value={Number.isFinite(bestLoss) ? bestLoss.toFixed(3) : '—'} accent />
         <Stat label="‖∇L‖" value={hint.mag.toFixed(2)} />
         {ls.fourD && <Stat label="w" value={cur[2].toFixed(2)} />}
       </div>
@@ -422,6 +413,7 @@ function Round({ event, name, diff, theme, onThemeChange, onAgain, onMenu }: {
           ls={ls}
           diff={diff}
           theme={theme}
+          t={t}
           z={done ? cur[2] : wTarget}
           path={path}
           losses={losses}
@@ -449,8 +441,8 @@ function Round({ event, name, diff, theme, onThemeChange, onAgain, onMenu }: {
           {ls.fourD && (
             <div className="slider">
               <div className="slider-label">
-                <span>4th dimension <b>w</b> → {wTarget.toFixed(2)}</span>
-                <button className="chip" onClick={() => setWTarget(zHint)}>use ∇</button>
+                <span>{t.fourthDimLabel} <b>w</b> → {wTarget.toFixed(2)}</span>
+                <button className="chip" onClick={() => setWTarget(zHint)}>{t.useGrad}</button>
               </div>
               <div className="slider-track">
                 <input
@@ -469,42 +461,41 @@ function Round({ event, name, diff, theme, onThemeChange, onAgain, onMenu }: {
           )}
           <div className="row">
             <button className={`toggle ${autoAim ? 'on' : ''}`} onClick={() => setAutoAim((a) => !a)}>
-              <span className="knob" /> Auto-aim −∇
+              <span className="knob" /> {t.autoAimToggle}
             </button>
             <span className="muted small">
-              {shotsTaken === 0 ? 'Drag on the map to shoot' : `${diff.shots - shotsTaken} shots left`}
+              {shotsTaken === 0 ? t.dragToShootHint : t.shotsLeftText(diff.shots - shotsTaken)}
             </span>
           </div>
           {shotsTaken > 0 && (
             <button className={`stop-btn ${confirmStop ? 'confirm' : ''}`} onClick={requestStop}>
-              {confirmStop ? 'Tap again to lock it in' : "I've found it — finish round"}
+              {confirmStop ? t.tapAgainBtn : t.finishRoundBtn}
             </button>
           )}
         </div>
       ) : (
         <div className="result">
           <div className="result-points">
-            <span className="big">{shownPoints}</span> <span className="muted">points</span>
+            <span className="big">{shownPoints}</span> <span className="muted">{t.pointsWord}</span>
           </div>
           <div className="muted">
-            best loss <b>{bestLoss.toFixed(3)}</b> · global minimum <b>{ls.lo.toFixed(3)}</b>
+            {t.bestLossPrefix} <b>{bestLoss.toFixed(3)}</b> · {t.globalMinPrefix} <b>{ls.lo.toFixed(3)}</b>
             {earlyStop && shotsTaken < diff.shots && (
-              <> · finished early ({shotsTaken}/{diff.shots} shots used)</>
+              <> · {t.finishedEarly(shotsTaken, diff.shots)}</>
             )}
           </div>
           <div className={`status ${status}`}>
-            {status === 'sending' && 'Publishing your score…'}
-            {status === 'ok' &&
-              (myRank ? `Published! You are #${myRank.pos} of ${myRank.total} on the leaderboard 🎉` : 'Published to the leaderboard 🎉')}
+            {status === 'sending' && t.publishing}
+            {status === 'ok' && (myRank ? t.publishedRank(myRank.pos, myRank.total) : t.publishedNoRank)}
             {status === 'error' && (
-              <>Could not publish. <button className="chip" onClick={() => void send()}>Retry</button></>
+              <>{t.publishFailed} <button className="chip" onClick={() => void send()}>{t.retryBtn}</button></>
             )}
-            {status === 'ok' && !usingFirebase && <div className="small muted">(demo mode: stored only in this browser)</div>}
+            {status === 'ok' && !usingFirebase && <div className="small muted">{t.demoModeNote}</div>}
           </div>
           <div className="row gap">
-            <button className="btn primary" onClick={onAgain}>Play again</button>
-            <button className="btn" onClick={onMenu}>Change level</button>
-            <button className="btn" onClick={() => navigate('/', event)}>Leaderboard</button>
+            <button className="btn primary" onClick={onAgain}>{t.playAgainBtn}</button>
+            <button className="btn" onClick={onMenu}>{t.changeLevelBtn}</button>
+            <button className="btn" onClick={() => navigate('/', event)}>{t.leaderboardBtn}</button>
           </div>
         </div>
       )}
@@ -522,17 +513,18 @@ function Stat({ label, value, accent }: { label: string; value: string; accent?:
 }
 
 function Sparkline({ losses, lo, hi }: { losses: number[]; lo: number; hi: number }) {
+  const { t } = useLang();
   const W = 300;
   const H = 40;
   const n = Math.max(losses.length, 2);
   const pts = losses.map((v, i) => {
-    const t = clamp((v - lo) / (hi - lo), 0, 1);
-    return `${(i / (n - 1)) * W},${4 + t * (H - 8)}`;
+    const t2 = clamp((v - lo) / (hi - lo), 0, 1);
+    return `${(i / (n - 1)) * W},${4 + t2 * (H - 8)}`;
   });
   return (
     <svg className="spark" viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none">
       <polyline points={pts.join(' ')} fill="none" stroke="var(--accent)" strokeWidth="2.5" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
-      <text x="4" y="12" className="spark-t">loss per step</text>
+      <text x="4" y="12" className="spark-t">{t.lossPerStep}</text>
     </svg>
   );
 }

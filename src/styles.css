@@ -51,6 +51,14 @@ input { font: inherit; color: inherit; }
   font-weight: 600; padding: 6px 0; align-self: center; cursor: pointer;
 }
 
+.lang-switch {
+  position: fixed; right: 12px; bottom: max(12px, env(safe-area-inset-bottom));
+  z-index: 45; display: flex; align-items: center; gap: 5px;
+  background: var(--panel-solid); border: 1px solid var(--border); border-radius: 999px;
+  padding: 7px 12px; font-size: 12px; font-weight: 700; color: var(--text);
+  box-shadow: 0 4px 16px rgba(0,0,0,0.35); cursor: pointer;
+}
+
 /* ---------- setup ---------- */
 .setup-head { text-align: center; margin-top: 6px; }
 .logo { font-size: 42px; line-height: 1; }

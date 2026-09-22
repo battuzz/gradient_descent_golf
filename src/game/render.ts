@@ -6,16 +6,15 @@ export const RES = 140;
 export type PaletteId = 'sunset' | 'viridis' | 'cividis' | 'iceFire';
 
 interface PaletteDef {
+  /** proper name of the colour scale — left untranslated (e.g. "Viridis" everywhere) */
   name: string;
-  /** short line describing who/what it's tuned for */
-  blurb: string;
   /** t=0 → best/lowest loss (bright), t=1 → worst/highest loss (dark, blends into the fog) */
   stops: [number, [number, number, number]][];
 }
 
 export const PALETTES: Record<PaletteId, PaletteDef> = {
   sunset: {
-    name: 'Sunset', blurb: 'Default — high-contrast, most colourful',
+    name: 'Sunset',
     stops: [
       [0.0, [214, 255, 56]],
       [0.18, [0, 224, 150]],
@@ -25,7 +24,7 @@ export const PALETTES: Record<PaletteId, PaletteDef> = {
     ],
   },
   viridis: {
-    name: 'Viridis', blurb: 'Colour-blind friendly (red-green safe)',
+    name: 'Viridis',
     stops: [
       [0.0, [253, 231, 37]],
       [0.25, [94, 201, 98]],
@@ -35,7 +34,7 @@ export const PALETTES: Record<PaletteId, PaletteDef> = {
     ],
   },
   cividis: {
-    name: 'Cividis', blurb: 'Optimised for colour vision deficiency',
+    name: 'Cividis',
     stops: [
       [0.0, [255, 234, 70]],
       [0.35, [184, 171, 91]],
@@ -45,7 +44,7 @@ export const PALETTES: Record<PaletteId, PaletteDef> = {
     ],
   },
   iceFire: {
-    name: 'Ice & Fire', blurb: 'Blue/orange — max contrast, no red-green',
+    name: 'Ice & Fire',
     stops: [
       [0.0, [255, 179, 71]],
       [0.32, [255, 240, 200]],

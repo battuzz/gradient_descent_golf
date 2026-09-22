@@ -3,11 +3,13 @@ import { QRCodeSVG } from 'qrcode.react';
 import { fetchScores, rank, usingFirebase, type ScoreEntry } from '../lib/scores';
 import { getDifficulty } from '../game/landscape';
 import { DEFAULT_EVENT, navigate, playUrl, setStoredEvent } from '../lib/route';
+import { useLang } from '../lib/i18n';
 
 const POLL_MS = 4000;
 const MEDALS = ['🥇', '🥈', '🥉'];
 
 export function Leaderboard({ event }: { event: string }) {
+  const { t } = useLang();
   const [entries, setEntries] = useState<ScoreEntry[] | null>(null);
   const [recent, setRecent] = useState<ScoreEntry[]>([]);
   const [totalPlays, setTotalPlays] = useState(0);
@@ -56,44 +58,44 @@ export function Leaderboard({ event }: { event: string }) {
       </div>
 
       <header className="board-head">
-        <div className="live-pill"><span className="dot" /> LIVE</div>
+        <div className="live-pill"><span className="dot" /> {t.live}</div>
         <div className="logo">⛳</div>
         <h1>Gradient Descent Golf</h1>
-        <p className="lead">Beat the machine. Find the minimum. Claim the top spot.</p>
+        <p className="lead">{t.tagline}</p>
       </header>
 
       <div className="board-grid">
         <div className="qr-card">
           <div className="scan-label">
-            <span>Scan to play</span>
+            <span>{t.scanToPlay}</span>
             <span className="bounce">▾</span>
           </div>
           <div className="qr-frame">
             <QRCodeSVG value={url} size={240} bgColor="transparent" fgColor="#eef4ff" level="M" includeMargin={false} />
           </div>
-          <button className="url" onClick={() => navigator.clipboard?.writeText(url).catch(() => {})} title="Copy link">
+          <button className="url" onClick={() => navigator.clipboard?.writeText(url).catch(() => {})} title={t.copyLink}>
             {url.replace(/^https?:\/\//, '')}
           </button>
           {editing ? (
             <EventEditor event={event} onDone={() => setEditing(false)} />
           ) : (
-            <button className="chip" onClick={() => setEditing(true)}>Event: {event} ✎</button>
+            <button className="chip" onClick={() => setEditing(true)}>{t.eventPrefix}: {event} ✎</button>
           )}
-          {!usingFirebase && <div className="badge warn">Demo mode — scores stay on this device only</div>}
+          {!usingFirebase && <div className="badge warn">{t.demoModeBadge}</div>}
         </div>
 
         <div className="board-right">
           <div className="stat-strip">
-            <div className="stat-chip"><b>{totalPlays}</b><span>rounds played</span></div>
-            <div className="stat-chip"><b>{entries?.length ?? 0}</b><span>players</span></div>
+            <div className="stat-chip"><b>{totalPlays}</b><span>{t.roundsPlayed}</span></div>
+            <div className="stat-chip"><b>{entries?.length ?? 0}</b><span>{t.players}</span></div>
           </div>
 
           <div className={`list-card ${flash ? 'flash' : ''}`}>
-            {err && <div className="badge error">Could not load the leaderboard.</div>}
+            {err && <div className="badge error">{t.couldNotLoadBoard}</div>}
             {!entries ? (
-              <div className="muted center pad">Loading…</div>
+              <div className="muted center pad">{t.loading}</div>
             ) : entries.length === 0 ? (
-              <div className="muted center pad">No scores yet — be the first!</div>
+              <div className="muted center pad">{t.noScoresYet}</div>
             ) : (
               <ol className="rows">
                 {entries.map((e, i) => (
@@ -117,19 +119,20 @@ export function Leaderboard({ event }: { event: string }) {
           <div className="ticker-track">
             {[...recent, ...recent].map((e, i) => (
               <span className="ticker-item" key={i}>
-                🏌️ <b>{e.name}</b> scored <b>{e.points}</b> pts on {getDifficulty(e.difficulty).label}
+                {t.tickerScored(e.name, e.points, getDifficulty(e.difficulty).label)}
               </span>
             ))}
           </div>
         </div>
       )}
 
-      <button className="link" onClick={() => navigate('/play', event)}>Play here instead →</button>
+      <button className="link" onClick={() => navigate('/play', event)}>{t.playHereInstead}</button>
     </div>
   );
 }
 
 function EventEditor({ event, onDone }: { event: string; onDone: () => void }) {
+  const { t } = useLang();
   const [v, setV] = useState(event);
   const apply = () => {
     const next = v.trim() || DEFAULT_EVENT;
@@ -139,7 +142,7 @@ function EventEditor({ event, onDone }: { event: string; onDone: () => void }) {
   return (
     <div className="row gap-sm">
       <input className="ev-input" value={v} maxLength={40} onChange={(e) => setV(e.target.value)} />
-      <button className="chip" onClick={apply}>Set</button>
+      <button className="chip" onClick={apply}>{t.eventSet}</button>
     </div>
   );
 }

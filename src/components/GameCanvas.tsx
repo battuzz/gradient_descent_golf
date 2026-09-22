@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import type { Difficulty, Landscape, Vec3 } from '../game/landscape';
 import { lossColor, paintHeat, RES, type PaletteId } from '../game/render';
+import type { Dict } from '../lib/i18n';
 
 export const MAX_STEP = 0.8; // world units of a full-power (lr = 1) shot
 const FLIGHT_MS = 750;
@@ -12,6 +13,7 @@ interface Props {
   ls: Landscape;
   diff: Difficulty;
   theme: PaletteId;
+  t: Dict;
   z: number;
   path: Vec3[];
   losses: number[];
@@ -204,7 +206,7 @@ export function GameCanvas(props: Props) {
         ctx.beginPath(); ctx.arc(gx, gy, 3.5, 0, Math.PI * 2); ctx.fill();
         if (!sameSlice) {
           ctx.font = '600 11px system-ui, sans-serif';
-          ctx.fillText(`goal at w=${p.ls.best[2].toFixed(2)}`, gx, gy + 14);
+          ctx.fillText(p.t.goalAtLabel(p.ls.best[2].toFixed(2)), gx, gy + 14);
         }
         ctx.globalAlpha = 1;
       }
@@ -283,7 +285,7 @@ export function GameCanvas(props: Props) {
 
       // preview badge: makes it unmistakable that the terrain shown is a different w-slice
       if (previewing) {
-        const label = `previewing w = ${p.z.toFixed(2)}`;
+        const label = p.t.previewingLabel(p.z.toFixed(2));
         ctx.font = '700 12px system-ui, sans-serif';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';

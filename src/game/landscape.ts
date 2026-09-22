@@ -4,8 +4,9 @@ export type DifficultyId = 'easy' | 'medium' | 'hard';
 
 export interface Difficulty {
   id: DifficultyId;
+  /** ML jargon (e.g. "SGD") — left untranslated everywhere it's shown. Description text for the
+   *  player lives in the i18n dict (Dict.diffBlurb), keyed by `id`. */
   label: string;
-  blurb: string;
   shots: number;
   /** Loss depends on a 3rd parameter `w` (=> 4D plot) controlled by a slider. */
   fourD: boolean;
@@ -26,17 +27,17 @@ export interface Difficulty {
 
 export const DIFFICULTIES: Difficulty[] = [
   {
-    id: 'easy', label: 'Batch GD', blurb: 'One smooth valley, exact gradient — just follow the arrow downhill.',
+    id: 'easy', label: 'Batch GD',
     shots: 8, fourD: false, decoys: 0, ripple: 0.03, gradNoise: 0, landNoise: 0,
     vision: 0.6, pixelSample: 1, multiplier: 1, autoAim: true,
   },
   {
-    id: 'medium', label: 'SGD', blurb: 'Bumpy terrain, noisy gradient, half the view, speckled.',
+    id: 'medium', label: 'SGD',
     shots: 7, fourD: false, decoys: 5, ripple: 0.11, gradNoise: 0.3, landNoise: 0.03,
     vision: 0.21, pixelSample: 0.5, multiplier: 1.25, autoAim: false,
   },
   {
-    id: 'hard', label: 'Hyper-SGD 4D', blurb: 'A hidden 4th dimension, tiny and sparsely-sampled view.',
+    id: 'hard', label: 'Hyper-SGD 4D',
     shots: 7, fourD: true, decoys: 7, ripple: 0.16, gradNoise: 0.45, landNoise: 0.05,
     vision: 0.16, pixelSample: 0.3, multiplier: 1.5, autoAim: false,
   },
