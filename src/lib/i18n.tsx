@@ -200,8 +200,8 @@ const it: Dict = {
   copyLink: 'Copia link',
   tickerScored: (name, points, diff) => `🏌️ ${name} ha segnato ${points} pt su ${diff}`,
 
-  setupLead: "Sei l'ottimizzatore. Fai rotolare la palla in discesa su un paesaggio di perdita nascosto e "
-    + 'trova la valle più profonda prima di esaurire i tiri.',
+  setupLead: 'Vesti i panni di un ottimizzatore. Scegli come muoverti e trova il punto più basso prima di '
+    + 'esaurire i tiri.',
   yourName: 'Il tuo nome',
   namePlaceholder: 'es. Ada Lovelace',
   enterNameToPick: 'Inserisci un nome per scegliere la difficoltà',
@@ -252,7 +252,7 @@ const it: Dict = {
   dragToShootHint: 'Trascina sulla mappa per tirare',
   shotsLeftText: (n) => `${n} tiri rimasti`,
   shotsLeftAria: (n) => `${n} tiri rimasti`,
-  finishRoundBtn: "L'ho trovato — termina il turno",
+  finishRoundBtn: 'Ho trovato il minimo — termina il turno',
   tapAgainBtn: 'Tocca di nuovo per confermare',
 
   pointsWord: 'punti',
