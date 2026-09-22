@@ -118,11 +118,12 @@ function Setup(props: {
  * then the player takes the shot it just taught them, then the next card appears. Tip 1
  * additionally renders a live colour-scale legend for the current theme.
  */
-const TUTORIAL_TIPS: { icon: string; text: string; legend?: boolean }[] = [
+const TUTORIAL_TIPS: { icon: string; text: string; note?: string; legend?: boolean }[] = [
   { icon: '🖱️', text: 'Drag on the map to shoot — how far you drag sets the learning rate.' },
   {
     icon: '🎯', legend: true,
-    text: "This is the loss. Bright means good, dark means bad — aim for the brightest colour, that's the minimum! You can customize the theme with the 🎨 in the top right.",
+    text: "This is the loss. Bright means good, dark means bad — aim for the brightest colour, that's the minimum!",
+    note: 'You can customize the theme with the 🎨 in the top right.',
   },
   {
     icon: '➤',
@@ -145,6 +146,7 @@ function TutorialOverlay({
         <button className="tip-skip" onClick={onSkip} aria-label="Skip tips">✕</button>
         <span className="tip-card-icon">{tip.icon}</span>
         <p className="tip-card-text">{tip.text}</p>
+        {tip.note && <p className="tip-card-note">{tip.note}</p>}
         {tip.legend && (
           <div className="tip-legend">
             <div className="tip-legend-bar" style={{ background: paletteSwatchCss(theme) }} />

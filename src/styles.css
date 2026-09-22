@@ -216,6 +216,7 @@ h1 { font-size: 22px; margin: 8px 0 4px; letter-spacing: -0.02em; }
 }
 .tip-card-icon { font-size: 36px; line-height: 1; }
 .tip-card-text { margin: 0; font-size: 15px; line-height: 1.45; }
+.tip-card-note { margin: 0; font-size: 13px; line-height: 1.4; color: var(--muted); }
 .tip-skip {
   position: absolute; top: 8px; right: 8px; background: none; border: none; color: var(--muted);
   font-size: 15px; padding: 8px; cursor: pointer; line-height: 1;
