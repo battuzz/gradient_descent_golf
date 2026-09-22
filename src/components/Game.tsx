@@ -97,20 +97,30 @@ function Setup(props: {
   );
 }
 
-/** One idea per banner, surfaced during play instead of a single upfront wall of text. */
+/** One idea per card, stepped through manually so none of them can be missed. */
 const TUTORIAL_TIPS: { icon: string; text: string }[] = [
+  { icon: '🎯', text: 'Aim for the minimum — the lower the loss, the more points you score.' },
   { icon: '🖱️', text: 'Drag on the map to shoot — how far you drag sets the learning rate.' },
   { icon: '➤', text: 'Follow the pulsing yellow arrow: the (noisy) −gradient, your best guess at downhill.' },
   { icon: '🌫️', text: "Fog hides the terrain — only spots you've actually visited stay revealed." },
 ];
 
-function TutorialBanner({ index, onSkip }: { index: number; onSkip: () => void }) {
-  const tip = TUTORIAL_TIPS[index];
+function TutorialOverlay({ step, onNext, onSkip }: { step: number; onNext: () => void; onSkip: () => void }) {
+  const tip = TUTORIAL_TIPS[step];
+  const last = step === TUTORIAL_TIPS.length - 1;
   return (
-    <div className="tip-banner" key={index}>
-      <span className="tip-icon">{tip.icon}</span>
-      <span className="tip-text">{tip.text}</span>
-      <button className="tip-close" onClick={onSkip} aria-label="Dismiss tips">✕</button>
+    <div className="tip-backdrop" role="dialog" aria-modal="true">
+      <div className="tip-card">
+        <button className="tip-skip" onClick={onSkip} aria-label="Skip tips">✕</button>
+        <span className="tip-card-icon">{tip.icon}</span>
+        <p className="tip-card-text">{tip.text}</p>
+        <div className="tip-dots">
+          {TUTORIAL_TIPS.map((_, i) => (
+            <span key={i} className={i === step ? 'on' : ''} />
+          ))}
+        </div>
+        <button className="btn primary" onClick={onNext}>{last ? "Got it — let's golf" : 'Next'}</button>
+      </div>
     </div>
   );
 }
@@ -135,19 +145,18 @@ function Round({ event, name, diff, onAgain, onMenu }: {
   const [tutorialSeen, setTutorialSeen] = useState(() => {
     try { return localStorage.getItem(TUTORIAL_KEY) === '1'; } catch { return true; }
   });
+  const [tipStep, setTipStep] = useState(0);
   const dismissTutorial = () => {
     try { localStorage.setItem(TUTORIAL_KEY, '1'); } catch { /* ignore */ }
     setTutorialSeen(true);
   };
+  const nextTip = () => {
+    if (tipStep + 1 >= TUTORIAL_TIPS.length) dismissTutorial();
+    else setTipStep((s) => s + 1);
+  };
 
   const shotsTaken = path.length - 1;
   const done = (shotsTaken >= diff.shots || earlyStop) && !flight;
-  // one tip per shot taken so far, then it retires itself for the rest of this device's rounds
-  const tipIndex = !tutorialSeen && !done && shotsTaken < TUTORIAL_TIPS.length ? shotsTaken : -1;
-  useEffect(() => {
-    if (!tutorialSeen && shotsTaken >= TUTORIAL_TIPS.length) dismissTutorial();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [shotsTaken]);
 
   const requestStop = () => {
     if (confirmStop) {
@@ -253,8 +262,6 @@ function Round({ event, name, diff, onAgain, onMenu }: {
         </div>
       </div>
 
-      {tipIndex >= 0 && <TutorialBanner index={tipIndex} onSkip={dismissTutorial} />}
-
       <div className="stats">
         <Stat label="Loss now" value={losses[losses.length - 1].toFixed(3)} />
         <Stat label="Best" value={Number.isFinite(bestLoss) ? bestLoss.toFixed(3) : '—'} accent />
@@ -272,11 +279,13 @@ function Round({ event, name, diff, onAgain, onMenu }: {
         flight={flight}
         hintDir={hint.dir}
         autoAim={autoAim}
-        disabled={done}
+        disabled={done || !tutorialSeen}
         revealAll={done}
         onShoot={onShoot}
         onLand={onLand}
       />
+
+      {!tutorialSeen && <TutorialOverlay step={tipStep} onNext={nextTip} onSkip={dismissTutorial} />}
 
       {!done ? (
         <div className="controls">

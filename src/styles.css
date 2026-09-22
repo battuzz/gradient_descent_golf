@@ -185,22 +185,30 @@ h1 { font-size: 22px; margin: 8px 0 4px; letter-spacing: -0.02em; }
 .tag { font-size: 11px; color: var(--muted); }
 .pts { font-weight: 800; color: var(--accent); font-size: 16px; }
 
-/* ---------- in-game tutorial banners ---------- */
-.tip-banner {
-  display: flex; align-items: center; gap: 10px;
-  background: linear-gradient(180deg, #17253f, #101828); border: 1px solid var(--accent-2);
-  border-radius: 14px; padding: 10px 12px; font-size: 13px;
-  animation: tip-in 0.35s ease-out;
+/* ---------- in-game tutorial cards ---------- */
+.tip-backdrop {
+  position: fixed; inset: 0; background: rgba(4,7,14,0.75); backdrop-filter: blur(2px);
+  display: flex; align-items: center; justify-content: center; padding: 24px; z-index: 50;
 }
-.tip-icon { font-size: 18px; line-height: 1; flex: none; }
-.tip-text { flex: 1; }
-.tip-close {
-  background: none; border: none; color: var(--muted); font-size: 14px; line-height: 1;
-  padding: 4px; cursor: pointer; flex: none;
+.tip-card {
+  position: relative; width: 100%; max-width: 320px;
+  background: var(--panel-solid); border: 1px solid var(--accent-2); border-radius: var(--radius);
+  padding: 30px 22px 22px; display: flex; flex-direction: column; align-items: center; gap: 14px;
+  text-align: center; animation: tip-pop 0.22s ease-out;
 }
-@keyframes tip-in {
-  from { opacity: 0; transform: translateY(-6px); }
-  to { opacity: 1; transform: translateY(0); }
+.tip-card-icon { font-size: 36px; line-height: 1; }
+.tip-card-text { margin: 0; font-size: 15px; line-height: 1.45; }
+.tip-skip {
+  position: absolute; top: 8px; right: 8px; background: none; border: none; color: var(--muted);
+  font-size: 15px; padding: 8px; cursor: pointer; line-height: 1;
+}
+.tip-dots { display: flex; gap: 6px; }
+.tip-dots span { width: 6px; height: 6px; border-radius: 50%; background: #2a3549; }
+.tip-dots span.on { background: var(--accent); }
+.tip-card .btn.primary { width: 100%; }
+@keyframes tip-pop {
+  from { opacity: 0; transform: scale(0.92); }
+  to { opacity: 1; transform: scale(1); }
 }
 
 @media (min-width: 640px) {
