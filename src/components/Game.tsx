@@ -113,15 +113,30 @@ function Setup(props: {
   );
 }
 
-/** One idea per card, stepped through manually so none of them can be missed. */
-const TUTORIAL_TIPS: { icon: string; text: string }[] = [
-  { icon: '🎯', text: 'Aim for the minimum — the lower the loss, the more points you score.' },
+/**
+ * One idea per card, interleaved with actual play: a card blocks the game until dismissed,
+ * then the player takes the shot it just taught them, then the next card appears. Tip 1
+ * additionally renders a live colour-scale legend for the current theme.
+ */
+const TUTORIAL_TIPS: { icon: string; text: string; legend?: boolean }[] = [
   { icon: '🖱️', text: 'Drag on the map to shoot — how far you drag sets the learning rate.' },
-  { icon: '➤', text: 'Follow the pulsing yellow arrow: the (noisy) −gradient, your best guess at downhill.' },
-  { icon: '🌫️', text: "Fog hides the terrain — only spots you've actually visited stay revealed." },
+  {
+    icon: '🎯', legend: true,
+    text: "This is the loss. Bright means good, dark means bad — aim for the brightest colour, that's the minimum!",
+  },
+  {
+    icon: '➤',
+    text: 'Follow the pulsing yellow arrow: the (noisy) −gradient, your best guess at downhill. Prefer to aim it yourself? Turn off Auto-aim.',
+  },
+  {
+    icon: '🌫️',
+    text: "Your information is limited — fog hides everything you haven't explored. Roam around to find the minimum!",
+  },
 ];
 
-function TutorialOverlay({ step, onNext, onSkip }: { step: number; onNext: () => void; onSkip: () => void }) {
+function TutorialOverlay({
+  step, theme, onNext, onSkip,
+}: { step: number; theme: PaletteId; onNext: () => void; onSkip: () => void }) {
   const tip = TUTORIAL_TIPS[step];
   const last = step === TUTORIAL_TIPS.length - 1;
   return (
@@ -130,6 +145,15 @@ function TutorialOverlay({ step, onNext, onSkip }: { step: number; onNext: () =>
         <button className="tip-skip" onClick={onSkip} aria-label="Skip tips">✕</button>
         <span className="tip-card-icon">{tip.icon}</span>
         <p className="tip-card-text">{tip.text}</p>
+        {tip.legend && (
+          <div className="tip-legend">
+            <div className="tip-legend-bar" style={{ background: paletteSwatchCss(theme) }} />
+            <div className="tip-legend-labels">
+              <span className="good">★ minimum</span>
+              <span className="bad">high loss</span>
+            </div>
+          </div>
+        )}
         <div className="tip-dots">
           {TUTORIAL_TIPS.map((_, i) => (
             <span key={i} className={i === step ? 'on' : ''} />
@@ -193,18 +217,31 @@ function Round({ event, name, diff, theme, onThemeChange, onAgain, onMenu }: {
   const [tutorialSeen, setTutorialSeen] = useState(() => {
     try { return localStorage.getItem(TUTORIAL_KEY) === '1'; } catch { return true; }
   });
-  const [tipStep, setTipStep] = useState(0);
+  // one card per shot taken so far: card[n] blocks play until dismissed, then shot n happens,
+  // which is what reveals card[n+1] — teaching by having them immediately do the thing just shown
+  const [dismissedCount, setDismissedCount] = useState(0);
   const dismissTutorial = () => {
     try { localStorage.setItem(TUTORIAL_KEY, '1'); } catch { /* ignore */ }
     setTutorialSeen(true);
   };
-  const nextTip = () => {
-    if (tipStep + 1 >= TUTORIAL_TIPS.length) dismissTutorial();
-    else setTipStep((s) => s + 1);
-  };
 
   const shotsTaken = path.length - 1;
   const done = (shotsTaken >= diff.shots || earlyStop) && !flight;
+  const tipShowing = !tutorialSeen && !done && dismissedCount < TUTORIAL_TIPS.length && shotsTaken === dismissedCount;
+  const nextTip = () => {
+    const n = dismissedCount + 1;
+    setDismissedCount(n);
+    if (n >= TUTORIAL_TIPS.length) dismissTutorial();
+  };
+  const skipTutorial = () => {
+    setDismissedCount(TUTORIAL_TIPS.length);
+    dismissTutorial();
+  };
+  // safety net: if the round ends mid-tutorial (e.g. an early finish), don't leave it dangling
+  useEffect(() => {
+    if (done && !tutorialSeen) dismissTutorial();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [done]);
 
   const requestStop = () => {
     if (confirmStop) {
@@ -231,7 +268,7 @@ function Round({ event, name, diff, theme, onThemeChange, onAgain, onMenu }: {
   }, [ls, shotsTaken]);
 
   const onShoot = (step: [number, number]) => {
-    if (flight || shotsTaken >= diff.shots) return;
+    if (flight || shotsTaken >= diff.shots || tipShowing) return;
     setConfirmStop(false);
     window.clearTimeout(confirmTimer.current);
     const r = rng(hashString(`${seed}:l:${shotsTaken}`));
@@ -329,13 +366,13 @@ function Round({ event, name, diff, theme, onThemeChange, onAgain, onMenu }: {
         flight={flight}
         hintDir={hint.dir}
         autoAim={autoAim}
-        disabled={done || !tutorialSeen}
+        disabled={done || tipShowing}
         revealAll={done}
         onShoot={onShoot}
         onLand={onLand}
       />
 
-      {!tutorialSeen && <TutorialOverlay step={tipStep} onNext={nextTip} onSkip={dismissTutorial} />}
+      {tipShowing && <TutorialOverlay step={dismissedCount} theme={theme} onNext={nextTip} onSkip={skipTutorial} />}
 
       {!done ? (
         <div className="controls">
