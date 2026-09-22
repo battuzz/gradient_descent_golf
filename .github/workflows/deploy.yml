@@ -17,6 +17,10 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
+    # must match the deploy job's environment: that's where the VITE_FIREBASE_* secrets live
+    # (GitHub scopes "environment secrets" to jobs that declare that same environment)
+    environment:
+      name: github-pages
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -24,6 +28,9 @@ jobs:
           node-version: 20
           cache: npm
       - run: npm ci
+      - name: Warn if Firebase config is missing
+        if: ${{ secrets.VITE_FIREBASE_API_KEY == '' || secrets.VITE_FIREBASE_PROJECT_ID == '' }}
+        run: echo "::warning::VITE_FIREBASE_API_KEY/PROJECT_ID secret is empty — this build will fall back to local demo mode instead of using Firestore."
       - run: npm run build
         env:
           VITE_FIREBASE_API_KEY: ${{ secrets.VITE_FIREBASE_API_KEY }}
