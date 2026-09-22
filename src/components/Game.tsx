@@ -52,13 +52,6 @@ function Setup(props: {
   onStart: (d: Difficulty['id']) => void;
 }) {
   const ok = props.name.trim().length > 0;
-  const [showTutorial, setShowTutorial] = useState(() => {
-    try { return !localStorage.getItem(TUTORIAL_KEY); } catch { return true; }
-  });
-  const closeTutorial = () => {
-    try { localStorage.setItem(TUTORIAL_KEY, '1'); } catch { /* ignore */ }
-    setShowTutorial(false);
-  };
   return (
     <div className="page setup">
       <header className="setup-head">
@@ -81,12 +74,6 @@ function Setup(props: {
         />
       </label>
 
-      <div className="how">
-        <div><b>Drag</b> on the map to shoot. Drag length = <b>learning rate</b>.</div>
-        <div><span className="arrow">➤</span> The yellow arrow is the (noisy) <b>−gradient</b>.</div>
-        <div>Fog hides the terrain: you only see what you have visited.</div>
-      </div>
-
       <div className="diffs">
         {DIFFICULTIES.map((d) => (
           <button key={d.id} className={`diff ${d.id}`} disabled={!ok} onClick={() => props.onStart(d.id)}>
@@ -101,43 +88,29 @@ function Setup(props: {
       </div>
       {!ok && <p className="muted center">Enter a name to pick a difficulty</p>}
       <div className="row gap-sm center">
-        <button className="link" onClick={() => setShowTutorial(true)}>❔ How to play</button>
+        <button className="link" onClick={() => { try { localStorage.removeItem(TUTORIAL_KEY); } catch { /* ignore */ } }}>
+          ❔ Show tips next round
+        </button>
         <button className="link" onClick={() => navigate('/', props.event)}>View leaderboard →</button>
       </div>
-
-      {showTutorial && <Tutorial onClose={closeTutorial} />}
     </div>
   );
 }
 
-function Tutorial({ onClose }: { onClose: () => void }) {
-  const steps: { icon: string; title: string; body: string }[] = [
-    { icon: '🖱️', title: 'Drag to shoot', body: 'Drag on the map. The drag length sets your learning rate (step size).' },
-    { icon: '➤', title: 'Follow the arrow', body: 'The pulsing yellow arrow points along the (−gradient): the steepest way downhill from where you stand.' },
-    { icon: '🌫️', title: 'Fog of war', body: "You only see terrain you've already visited — explore to reveal more of the map." },
-    { icon: '⛳', title: 'Reach the minimum', body: 'Get the ball as low as possible before you run out of shots. Lower loss = more points.' },
-  ];
+/** One idea per banner, surfaced during play instead of a single upfront wall of text. */
+const TUTORIAL_TIPS: { icon: string; text: string }[] = [
+  { icon: '🖱️', text: 'Drag on the map to shoot — how far you drag sets the learning rate.' },
+  { icon: '➤', text: 'Follow the pulsing yellow arrow: the (noisy) −gradient, your best guess at downhill.' },
+  { icon: '🌫️', text: "Fog hides the terrain — only spots you've actually visited stay revealed." },
+];
+
+function TutorialBanner({ index, onSkip }: { index: number; onSkip: () => void }) {
+  const tip = TUTORIAL_TIPS[index];
   return (
-    <div className="tutorial-backdrop" role="dialog" aria-modal="true" onClick={onClose}>
-      <div className="tutorial-card" onClick={(e) => e.stopPropagation()}>
-        <h2>Quick tutorial</h2>
-        <div className="tutorial-steps">
-          {steps.map((s) => (
-            <div className="tutorial-step" key={s.title}>
-              <span className="tutorial-icon">{s.icon}</span>
-              <div>
-                <b>{s.title}</b>
-                <p>{s.body}</p>
-              </div>
-            </div>
-          ))}
-        </div>
-        <p className="muted small">
-          Tip: <b>Batch GD</b> starts with <b>Auto-aim</b> on — it walks straight downhill for you, so you just pick
-          how far to step. Try it first, then turn Auto-aim off on later levels to aim by hand.
-        </p>
-        <button className="btn primary" onClick={onClose}>Got it — let's golf →</button>
-      </div>
+    <div className="tip-banner" key={index}>
+      <span className="tip-icon">{tip.icon}</span>
+      <span className="tip-text">{tip.text}</span>
+      <button className="tip-close" onClick={onSkip} aria-label="Dismiss tips">✕</button>
     </div>
   );
 }
@@ -159,9 +132,22 @@ function Round({ event, name, diff, onAgain, onMenu }: {
   const [earlyStop, setEarlyStop] = useState(false);
   const [confirmStop, setConfirmStop] = useState(false);
   const confirmTimer = useRef<number | undefined>(undefined);
+  const [tutorialSeen, setTutorialSeen] = useState(() => {
+    try { return localStorage.getItem(TUTORIAL_KEY) === '1'; } catch { return true; }
+  });
+  const dismissTutorial = () => {
+    try { localStorage.setItem(TUTORIAL_KEY, '1'); } catch { /* ignore */ }
+    setTutorialSeen(true);
+  };
 
   const shotsTaken = path.length - 1;
   const done = (shotsTaken >= diff.shots || earlyStop) && !flight;
+  // one tip per shot taken so far, then it retires itself for the rest of this device's rounds
+  const tipIndex = !tutorialSeen && !done && shotsTaken < TUTORIAL_TIPS.length ? shotsTaken : -1;
+  useEffect(() => {
+    if (!tutorialSeen && shotsTaken >= TUTORIAL_TIPS.length) dismissTutorial();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [shotsTaken]);
 
   const requestStop = () => {
     if (confirmStop) {
@@ -266,6 +252,8 @@ function Round({ event, name, diff, onAgain, onMenu }: {
           ))}
         </div>
       </div>
+
+      {tipIndex >= 0 && <TutorialBanner index={tipIndex} onSkip={dismissTutorial} />}
 
       <div className="stats">
         <Stat label="Loss now" value={losses[losses.length - 1].toFixed(3)} />
