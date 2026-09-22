@@ -99,12 +99,18 @@ function pixelRand(seed: number, i: number, j: number): number {
  * (the "fog of war") show their real colours, unless `revealAll` is set. `pixelSample` < 1
  * additionally keeps only a random fraction of those pixels — a sparse, speckled reveal
  * instead of a solid patch — so higher difficulties give you scattered samples, not the map.
+ *
+ * On 4D courses, older reveals fade out as the previewed slice `z` drifts from the w they were
+ * seen at — but `ballXY` (where the ball is standing right now) stays fully visible around
+ * itself at every `z`, so dragging the w-slider never blinds you to your own surroundings,
+ * only to terrain you explored elsewhere.
  */
 export function paintHeat(
   img: ImageData,
   ls: Landscape,
   z: number,
   reveals: Vec3[],
+  ballXY: [number, number],
   vision: number,
   revealAll: boolean,
   pixelSample: number,
@@ -121,6 +127,12 @@ export function paintHeat(
       let a = 0;
       if (revealAll) a = 1;
       else {
+        // the ball's own neighbourhood: full visibility, no w falloff, at every slice
+        const bdx = x - ballXY[0];
+        const bdy = y - ballXY[1];
+        const bdd = Math.sqrt(bdx * bdx + bdy * bdy);
+        if (bdd < vision) a = bdd <= inner ? 1 : 1 - (bdd - inner) / (vision - inner);
+
         for (let n = 0; n < reveals.length; n++) {
           const p = reveals[n];
           const dx = x - p[0];

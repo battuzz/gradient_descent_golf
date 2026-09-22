@@ -50,9 +50,13 @@ export function GameCanvas(props: Props) {
     const img = octx.createImageData(RES, RES);
     // the finished round always reveals cleanly (no stippling) so the recap map reads well
     const pixelSample = props.revealAll ? 1 : props.diff.pixelSample;
-    paintHeat(img, props.ls, props.z, props.reveals, props.diff.vision, props.revealAll, pixelSample, props.theme);
+    const ball = props.path[props.path.length - 1];
+    paintHeat(
+      img, props.ls, props.z, props.reveals, [ball[0], ball[1]],
+      props.diff.vision, props.revealAll, pixelSample, props.theme,
+    );
     octx.putImageData(img, 0, 0);
-  }, [props.ls, props.z, props.reveals, props.diff.vision, props.diff.pixelSample, props.revealAll, props.theme]);
+  }, [props.ls, props.z, props.reveals, props.path, props.diff.vision, props.diff.pixelSample, props.revealAll, props.theme]);
 
   // ----- sizing
   useEffect(() => {
