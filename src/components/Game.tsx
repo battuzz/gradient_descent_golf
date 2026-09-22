@@ -10,6 +10,7 @@ import { navigate } from '../lib/route';
 
 const NAME_KEY = 'gdg.name';
 const TUTORIAL_KEY = 'gdg.tutorialSeen';
+const FOURD_KEY = 'gdg.tutorial4dSeen';
 const THEME_KEY = 'gdg.theme';
 const W_STEP = 0.5; // max change of the 4th parameter per shot
 
@@ -169,6 +170,26 @@ function TutorialOverlay({
   );
 }
 
+/** One-off, shown the first time a player opens a 4D difficulty — explains the w-slider. */
+function FourDIntro({ onDismiss }: { onDismiss: () => void }) {
+  return (
+    <div className="tip-backdrop" role="dialog" aria-modal="true">
+      <div className="tip-card">
+        <button className="tip-skip" onClick={onDismiss} aria-label="Dismiss">✕</button>
+        <span className="tip-card-icon">🎚️</span>
+        <p className="tip-card-text">
+          This level hides a 4th dimension, <b>w</b>. Drag the slider below the map to choose where you'll land
+          along it.
+        </p>
+        <p className="tip-card-text">
+          The white mark shows where you are now; the yellow mark shows where the gradient suggests moving.
+        </p>
+        <button className="btn primary" onClick={onDismiss}>Got it</button>
+      </div>
+    </div>
+  );
+}
+
 /** Lets players swap the heat-map colour scale for one that suits their colour vision. */
 function ThemePicker({ theme, onChange }: { theme: PaletteId; onChange: (t: PaletteId) => void }) {
   const [open, setOpen] = useState(false);
@@ -221,6 +242,15 @@ function Round({ event, name, diff, theme, onThemeChange, onAgain, onMenu }: {
   const [tutorialSeen, setTutorialSeen] = useState(() => {
     try { return localStorage.getItem(TUTORIAL_KEY) === '1'; } catch { return true; }
   });
+  const [fourDSeen, setFourDSeen] = useState(() => {
+    try { return localStorage.getItem(FOURD_KEY) === '1'; } catch { return true; }
+  });
+  // shown once, before anything else, the first time a 4D difficulty is opened
+  const fourDPending = diff.fourD && !fourDSeen;
+  const dismissFourD = () => {
+    try { localStorage.setItem(FOURD_KEY, '1'); } catch { /* ignore */ }
+    setFourDSeen(true);
+  };
   // one card per shot taken so far: card[n] blocks play until dismissed, then shot n happens,
   // which is what reveals card[n+1] — teaching by having them immediately do the thing just shown
   const [dismissedCount, setDismissedCount] = useState(0);
@@ -231,7 +261,9 @@ function Round({ event, name, diff, theme, onThemeChange, onAgain, onMenu }: {
 
   const shotsTaken = path.length - 1;
   const done = (shotsTaken >= diff.shots || earlyStop) && !flight;
-  const tipShowing = !tutorialSeen && !done && dismissedCount < TUTORIAL_TIPS.length && shotsTaken === dismissedCount;
+  const tipShowing =
+    !fourDPending && !tutorialSeen && !done && dismissedCount < TUTORIAL_TIPS.length && shotsTaken === dismissedCount;
+  const blocked = fourDPending || tipShowing;
   const nextTip = () => {
     const n = dismissedCount + 1;
     setDismissedCount(n);
@@ -244,6 +276,7 @@ function Round({ event, name, diff, theme, onThemeChange, onAgain, onMenu }: {
   // safety net: if the round ends mid-tutorial (e.g. an early finish), don't leave it dangling
   useEffect(() => {
     if (done && !tutorialSeen) dismissTutorial();
+    if (done && fourDPending) dismissFourD();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [done]);
 
@@ -272,7 +305,7 @@ function Round({ event, name, diff, theme, onThemeChange, onAgain, onMenu }: {
   }, [ls, shotsTaken]);
 
   const onShoot = (step: [number, number]) => {
-    if (flight || shotsTaken >= diff.shots || tipShowing) return;
+    if (flight || shotsTaken >= diff.shots || blocked) return;
     setConfirmStop(false);
     window.clearTimeout(confirmTimer.current);
     const r = rng(hashString(`${seed}:l:${shotsTaken}`));
@@ -370,13 +403,17 @@ function Round({ event, name, diff, theme, onThemeChange, onAgain, onMenu }: {
         flight={flight}
         hintDir={hint.dir}
         autoAim={autoAim}
-        disabled={done || tipShowing}
+        disabled={done || blocked}
         revealAll={done}
         onShoot={onShoot}
         onLand={onLand}
       />
 
-      {tipShowing && <TutorialOverlay step={dismissedCount} theme={theme} onNext={nextTip} onSkip={skipTutorial} />}
+      {fourDPending ? (
+        <FourDIntro onDismiss={dismissFourD} />
+      ) : (
+        tipShowing && <TutorialOverlay step={dismissedCount} theme={theme} onNext={nextTip} onSkip={skipTutorial} />
+      )}
 
       {!done ? (
         <div className="controls">
