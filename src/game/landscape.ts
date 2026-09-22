@@ -26,8 +26,8 @@ export interface Difficulty {
 
 export const DIFFICULTIES: Difficulty[] = [
   {
-    id: 'easy', label: 'Batch GD', blurb: 'Smooth terrain, exact gradient, wide view.',
-    shots: 8, fourD: false, decoys: 3, ripple: 0.03, gradNoise: 0, landNoise: 0,
+    id: 'easy', label: 'Batch GD', blurb: 'One smooth valley, exact gradient — just follow the arrow downhill.',
+    shots: 8, fourD: false, decoys: 0, ripple: 0.03, gradNoise: 0, landNoise: 0,
     vision: 0.6, pixelSample: 1, multiplier: 1, autoAim: true,
   },
   {

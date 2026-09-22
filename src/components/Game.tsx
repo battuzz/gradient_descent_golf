@@ -8,6 +8,7 @@ import { fetchScores, rank, submitScore, usingFirebase } from '../lib/scores';
 import { navigate } from '../lib/route';
 
 const NAME_KEY = 'gdg.name';
+const TUTORIAL_KEY = 'gdg.tutorialSeen';
 const W_STEP = 0.5; // max change of the 4th parameter per shot
 
 const clamp = (v: number, a: number, b: number) => Math.min(b, Math.max(a, v));
@@ -51,6 +52,13 @@ function Setup(props: {
   onStart: (d: Difficulty['id']) => void;
 }) {
   const ok = props.name.trim().length > 0;
+  const [showTutorial, setShowTutorial] = useState(() => {
+    try { return !localStorage.getItem(TUTORIAL_KEY); } catch { return true; }
+  });
+  const closeTutorial = () => {
+    try { localStorage.setItem(TUTORIAL_KEY, '1'); } catch { /* ignore */ }
+    setShowTutorial(false);
+  };
   return (
     <div className="page setup">
       <header className="setup-head">
@@ -92,7 +100,44 @@ function Setup(props: {
         ))}
       </div>
       {!ok && <p className="muted center">Enter a name to pick a difficulty</p>}
-      <button className="link" onClick={() => navigate('/', props.event)}>View leaderboard →</button>
+      <div className="row gap-sm center">
+        <button className="link" onClick={() => setShowTutorial(true)}>❔ How to play</button>
+        <button className="link" onClick={() => navigate('/', props.event)}>View leaderboard →</button>
+      </div>
+
+      {showTutorial && <Tutorial onClose={closeTutorial} />}
+    </div>
+  );
+}
+
+function Tutorial({ onClose }: { onClose: () => void }) {
+  const steps: { icon: string; title: string; body: string }[] = [
+    { icon: '🖱️', title: 'Drag to shoot', body: 'Drag on the map. The drag length sets your learning rate (step size).' },
+    { icon: '➤', title: 'Follow the arrow', body: 'The pulsing yellow arrow points along the (−gradient): the steepest way downhill from where you stand.' },
+    { icon: '🌫️', title: 'Fog of war', body: "You only see terrain you've already visited — explore to reveal more of the map." },
+    { icon: '⛳', title: 'Reach the minimum', body: 'Get the ball as low as possible before you run out of shots. Lower loss = more points.' },
+  ];
+  return (
+    <div className="tutorial-backdrop" role="dialog" aria-modal="true" onClick={onClose}>
+      <div className="tutorial-card" onClick={(e) => e.stopPropagation()}>
+        <h2>Quick tutorial</h2>
+        <div className="tutorial-steps">
+          {steps.map((s) => (
+            <div className="tutorial-step" key={s.title}>
+              <span className="tutorial-icon">{s.icon}</span>
+              <div>
+                <b>{s.title}</b>
+                <p>{s.body}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+        <p className="muted small">
+          Tip: <b>Batch GD</b> starts with <b>Auto-aim</b> on — it walks straight downhill for you, so you just pick
+          how far to step. Try it first, then turn Auto-aim off on later levels to aim by hand.
+        </p>
+        <button className="btn primary" onClick={onClose}>Got it — let's golf →</button>
+      </div>
     </div>
   );
 }
