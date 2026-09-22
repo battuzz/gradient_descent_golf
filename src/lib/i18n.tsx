@@ -61,6 +61,12 @@ export interface Dict {
   changeColoursAria: string;
   colorBarAria: string;
   toggle3DAria: string;
+  camControlsAria: string;
+  rotateLeftAria: string;
+  rotateRightAria: string;
+  zoomInAria: string;
+  zoomOutAria: string;
+  resetViewAria: string;
 
   // ---- round HUD
   backAria: string;
@@ -154,6 +160,12 @@ const en: Dict = {
   changeColoursAria: 'Change heat-map colours',
   colorBarAria: 'Colour scale from highest loss (worst) at the top to lowest loss (best) at the bottom',
   toggle3DAria: 'Switch between flat heat-map and 3D relief view',
+  camControlsAria: '3D camera controls',
+  rotateLeftAria: 'Rotate view left',
+  rotateRightAria: 'Rotate view right',
+  zoomInAria: 'Zoom in',
+  zoomOutAria: 'Zoom out',
+  resetViewAria: 'Reset 3D view',
 
   backAria: 'Back',
   statLossNow: 'Loss now',
@@ -245,6 +257,12 @@ const it: Dict = {
   changeColoursAria: 'Cambia i colori della mappa',
   colorBarAria: 'Scala colori: loss più alta (peggiore) in alto, loss più bassa (migliore) in basso',
   toggle3DAria: 'Passa dalla mappa termica piatta alla vista in rilievo 3D',
+  camControlsAria: 'Controlli della fotocamera 3D',
+  rotateLeftAria: 'Ruota la vista a sinistra',
+  rotateRightAria: 'Ruota la vista a destra',
+  zoomInAria: 'Aumenta lo zoom',
+  zoomOutAria: 'Riduci lo zoom',
+  resetViewAria: 'Ripristina la vista 3D',
 
   backAria: 'Indietro',
   statLossNow: 'Loss attuale',

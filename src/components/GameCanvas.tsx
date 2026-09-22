@@ -1,14 +1,35 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef } from 'react';
 import type { Difficulty, Landscape, Vec3 } from '../game/landscape';
-import { lossColor, paintHeat, paintTerrain3D, RES, type PaletteId } from '../game/render';
+import { buildTerrainMesh, drawTerrainMesh, lossColor, paintHeat, RES, type PaletteId, type TerrainMesh } from '../game/render';
 import { isoProject, isoProjectDir, isoUnprojectDelta, makeIsoView, type IsoView } from '../game/iso';
 import type { Dict } from '../lib/i18n';
 
 const clamp01 = (v: number) => (v < 0 ? 0 : v > 1 ? 1 : v);
+const clamp = (v: number, a: number, b: number) => Math.min(b, Math.max(a, v));
 
 export const MAX_STEP = 0.8; // world units of a full-power (lr = 1) shot
 const FLIGHT_MS = 750;
 const DEAD_ZONE = 14; // px: drags shorter than this cancel the shot
+
+// ----- 3D camera: azimuth (theta) + pitch (phi) + zoom, orbited by the user
+const CAM_THETA0 = Math.PI / 4;
+const CAM_PHI0 = Math.atan(0.55);
+const CAM_ZOOM0 = 1;
+const PHI_MIN = (12 * Math.PI) / 180;
+const PHI_MAX = (80 * Math.PI) / 180;
+const ZOOM_MIN = 0.55;
+const ZOOM_MAX = 2.6;
+const CAM_LERP = 0.18; // per-frame smoothing toward the target angle/zoom
+const ROT_STEP = Math.PI / 8; // 22.5° per button click
+const ZOOM_STEP = 1.25; // per button click
+const clampPhi = (p: number) => clamp(p, PHI_MIN, PHI_MAX);
+const clampZoom = (z: number) => clamp(z, ZOOM_MIN, ZOOM_MAX);
+
+interface CamState { theta: number; phi: number; zoom: number; tTheta: number; tPhi: number; tZoom: number }
+const initialCam = (): CamState => ({
+  theta: CAM_THETA0, phi: CAM_PHI0, zoom: CAM_ZOOM0,
+  tTheta: CAM_THETA0, tPhi: CAM_PHI0, tZoom: CAM_ZOOM0,
+});
 
 export interface Flight { from: Vec3; to: Vec3; t0: number }
 
@@ -38,34 +59,30 @@ export function GameCanvas(props: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
   const heatRef = useRef<HTMLCanvasElement | null>(null);
+  const meshRef = useRef<TerrainMesh | null>(null);
   const propsRef = useRef(props);
   propsRef.current = props;
   const aimRef = useRef<{ sx: number; sy: number; cx: number; cy: number } | null>(null);
   const landedRef = useRef<Flight | null>(null);
   const sizeRef = useRef({ css: 300, dpr: 1 });
-  const [size, setSize] = useState(300);
+  const camRef = useRef<CamState>(initialCam());
 
-  // ----- terrain layer: a flat heat-map, or a shaded 3D relief mesh (recomputed only when the
-  // revealed area / slice / view mode changes, then just blitted every frame)
+  // ----- terrain layer: a flat heat-map, or a 3D relief mesh. Building it (loss/palette
+  // sampling) only happens when the revealed area / slice / view mode changes; the 3D mesh is
+  // then reprojected every frame at whatever camera angle/zoom is current (see the render loop).
   useEffect(() => {
-    let off = heatRef.current;
-    if (!off) {
-      off = document.createElement('canvas');
-      heatRef.current = off;
-    }
     const ball = props.path[props.path.length - 1];
     if (props.view3d) {
-      off.width = size;
-      off.height = size;
-      const octx = off.getContext('2d')!;
-      octx.clearRect(0, 0, size, size);
-      paintTerrain3D(
-        octx, makeIsoView(size), props.ls, props.z, props.reveals, [ball[0], ball[1]],
-        props.diff.vision, props.revealAll, props.theme,
+      meshRef.current = buildTerrainMesh(
+        props.ls, props.z, props.reveals, [ball[0], ball[1]], props.diff.vision, props.revealAll, props.theme,
       );
     } else {
-      off.width = RES;
-      off.height = RES;
+      let off = heatRef.current;
+      if (!off) {
+        off = document.createElement('canvas');
+        off.width = off.height = RES;
+        heatRef.current = off;
+      }
       const octx = off.getContext('2d')!;
       const img = octx.createImageData(RES, RES);
       // the finished round always reveals cleanly (no stippling) so the recap map reads well
@@ -78,7 +95,7 @@ export function GameCanvas(props: Props) {
     }
   }, [
     props.ls, props.z, props.reveals, props.path, props.diff.vision, props.diff.pixelSample,
-    props.revealAll, props.theme, props.view3d, size,
+    props.revealAll, props.theme, props.view3d,
   ]);
 
   // ----- sizing
@@ -91,7 +108,6 @@ export function GameCanvas(props: Props) {
       sizeRef.current = { css, dpr };
       canvas.width = css * dpr;
       canvas.height = css * dpr;
-      setSize(css);
     };
     resize();
     const ro = new ResizeObserver(resize);
@@ -99,43 +115,94 @@ export function GameCanvas(props: Props) {
     return () => ro.disconnect();
   }, []);
 
-  // ----- pointer input
+  // ----- pointer input: one finger/pointer aims and shoots (unchanged); a second finger
+  // switches to orbiting the 3D camera (drag to rotate/tilt, pinch to zoom) instead, so the two
+  // gestures never fight over the same touch.
   useEffect(() => {
     const canvas = canvasRef.current!;
+    const pointers = new Map<number, { x: number; y: number }>();
+    let camGesture: {
+      dist: number; midX: number; midY: number; theta: number; phi: number; zoom: number;
+    } | null = null;
+
     const rel = (e: PointerEvent) => {
       const r = canvas.getBoundingClientRect();
       return [e.clientX - r.left, e.clientY - r.top] as const;
     };
+    const twoPointerStats = () => {
+      const [a, b] = [...pointers.values()];
+      return {
+        dist: Math.hypot(a.x - b.x, a.y - b.y) || 1,
+        midX: (a.x + b.x) / 2,
+        midY: (a.y + b.y) / 2,
+      };
+    };
     const down = (e: PointerEvent) => {
-      const p = propsRef.current;
-      if (p.disabled || p.flight) return;
-      canvas.setPointerCapture(e.pointerId);
       const [x, y] = rel(e);
-      aimRef.current = { sx: x, sy: y, cx: x, cy: y };
+      pointers.set(e.pointerId, { x, y });
+      canvas.setPointerCapture(e.pointerId);
+      if (pointers.size === 1) {
+        const p = propsRef.current;
+        if (p.disabled || p.flight) return;
+        aimRef.current = { sx: x, sy: y, cx: x, cy: y };
+      } else if (pointers.size === 2) {
+        aimRef.current = null; // a second touch always cancels an in-progress aim
+        const cam = camRef.current;
+        camGesture = { ...twoPointerStats(), theta: cam.tTheta, phi: cam.tPhi, zoom: cam.tZoom };
+      }
     };
     const move = (e: PointerEvent) => {
-      if (!aimRef.current) return;
+      if (!pointers.has(e.pointerId)) return;
       const [x, y] = rel(e);
-      aimRef.current.cx = x;
-      aimRef.current.cy = y;
+      pointers.set(e.pointerId, { x, y });
+      if (pointers.size === 2 && camGesture && propsRef.current.view3d) {
+        const { dist, midX, midY } = twoPointerStats();
+        const cam = camRef.current;
+        cam.tTheta = camGesture.theta + (midX - camGesture.midX) * 0.012;
+        cam.tPhi = clampPhi(camGesture.phi - (midY - camGesture.midY) * 0.008);
+        cam.tZoom = clampZoom(camGesture.zoom * (dist / camGesture.dist));
+      } else if (aimRef.current) {
+        aimRef.current.cx = x;
+        aimRef.current.cy = y;
+      }
     };
-    const up = () => {
-      const a = aimRef.current;
-      aimRef.current = null;
-      if (!a) return;
-      const step = computeStep(a, propsRef.current, sizeRef.current.css);
-      if (step) propsRef.current.onShoot(step.world);
+    const release = (e: PointerEvent) => {
+      pointers.delete(e.pointerId);
+      if (pointers.size < 2) camGesture = null;
+      if (pointers.size === 0) {
+        const a = aimRef.current;
+        aimRef.current = null;
+        if (a) {
+          const step = computeStep(a, propsRef.current, sizeRef.current.css, camRef.current);
+          if (step) propsRef.current.onShoot(step.world);
+        }
+      }
+    };
+    const wheel = (e: WheelEvent) => {
+      if (!propsRef.current.view3d) return;
+      e.preventDefault();
+      camRef.current.tZoom = clampZoom(camRef.current.tZoom * Math.exp(-e.deltaY * 0.0015));
     };
     canvas.addEventListener('pointerdown', down);
     canvas.addEventListener('pointermove', move);
-    canvas.addEventListener('pointerup', up);
-    canvas.addEventListener('pointercancel', () => (aimRef.current = null));
+    canvas.addEventListener('pointerup', release);
+    canvas.addEventListener('pointercancel', release);
+    canvas.addEventListener('wheel', wheel, { passive: false });
     return () => {
       canvas.removeEventListener('pointerdown', down);
       canvas.removeEventListener('pointermove', move);
-      canvas.removeEventListener('pointerup', up);
+      canvas.removeEventListener('pointerup', release);
+      canvas.removeEventListener('pointercancel', release);
+      canvas.removeEventListener('wheel', wheel);
     };
   }, []);
+
+  const rotateCam = (d: number) => { camRef.current.tTheta += d; };
+  const zoomCam = (f: number) => { camRef.current.tZoom = clampZoom(camRef.current.tZoom * f); };
+  const resetCam = () => {
+    const cam = camRef.current;
+    cam.tTheta = CAM_THETA0; cam.tPhi = CAM_PHI0; cam.tZoom = CAM_ZOOM0;
+  };
 
   // ----- render loop
   useEffect(() => {
@@ -150,20 +217,31 @@ export function GameCanvas(props: Props) {
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       const px = (x: number) => ((x + 1) / 2) * S;
       const py = (y: number) => ((y + 1) / 2) * S;
-      const iso: IsoView | null = p.view3d ? makeIsoView(S) : null;
+
+      // smoothly ease the camera toward whatever the last drag/pinch/button/wheel set as target
+      const cam = camRef.current;
+      cam.theta += (cam.tTheta - cam.theta) * CAM_LERP;
+      cam.phi += (cam.tPhi - cam.phi) * CAM_LERP;
+      cam.zoom += (cam.tZoom - cam.zoom) * CAM_LERP;
+      const iso: IsoView | null = p.view3d ? makeIsoView(S, cam.theta, cam.phi, cam.zoom) : null;
       const span = p.ls.hi - p.ls.lo;
       const elevOf = (loss: number) => clamp01((loss - p.ls.lo) / span);
       // world position + normalised elevation -> screen pixel, in whichever mode is active
       const proj = (x: number, y: number, elev: number): [number, number] =>
         iso ? isoProject(iso, x, y, elev) : [px(x), py(y)];
 
-      // heat / terrain — always clear first: the 3D mesh is a diamond that doesn't cover the
-      // full square, so leftover pixels from a previous (possibly 2D) frame would show through
+      // heat / terrain — always clear first: unexplored 3D terrain isn't drawn at all (rather
+      // than as a flat plane), so leftover pixels from a previous frame would otherwise show
       ctx.clearRect(0, 0, S, S);
       ctx.imageSmoothingEnabled = true;
       ctx.imageSmoothingQuality = 'high';
-      if (heatRef.current) ctx.drawImage(heatRef.current, 0, 0, S, S);
-      else { ctx.fillStyle = '#0d1420'; ctx.fillRect(0, 0, S, S); }
+      if (iso) {
+        if (meshRef.current) drawTerrainMesh(ctx, meshRef.current, iso);
+      } else if (heatRef.current) {
+        ctx.drawImage(heatRef.current, 0, 0, S, S);
+      } else {
+        ctx.fillStyle = '#0d1420'; ctx.fillRect(0, 0, S, S);
+      }
 
       // flat reference grid — only meaningful in the top-down 2D view
       if (!iso) {
@@ -295,7 +373,7 @@ export function GameCanvas(props: Props) {
 
         const a = aimRef.current;
         if (a) {
-          const st = computeStep(a, p, S);
+          const st = computeStep(a, p, S, cam);
           if (st) {
             const wtx = ball[0] + st.world[0];
             const wty = ball[1] + st.world[1];
@@ -358,6 +436,15 @@ export function GameCanvas(props: Props) {
   return (
     <div className="canvas-wrap" ref={wrapRef}>
       <canvas ref={canvasRef} className="game-canvas" />
+      {props.view3d && (
+        <div className="cam-controls" role="group" aria-label={props.t.camControlsAria}>
+          <button onClick={() => rotateCam(-ROT_STEP)} aria-label={props.t.rotateLeftAria}>◂</button>
+          <button onClick={() => rotateCam(ROT_STEP)} aria-label={props.t.rotateRightAria}>▸</button>
+          <button onClick={() => zoomCam(1 / ZOOM_STEP)} aria-label={props.t.zoomOutAria}>−</button>
+          <button onClick={() => zoomCam(ZOOM_STEP)} aria-label={props.t.zoomInAria}>+</button>
+          <button onClick={resetCam} aria-label={props.t.resetViewAria}>⟲</button>
+        </div>
+      )}
     </div>
   );
 }
@@ -366,6 +453,7 @@ function computeStep(
   a: { sx: number; sy: number; cx: number; cy: number },
   p: Props,
   size: number,
+  cam: CamState,
 ): { world: [number, number]; lr: number } | null {
   const vx = a.cx - a.sx;
   const vy = a.cy - a.sy;
@@ -376,7 +464,7 @@ function computeStep(
   if (p.autoAim) {
     dir = p.hintDir;
   } else if (p.view3d) {
-    const [wx, wy] = isoUnprojectDelta(makeIsoView(size), vx, vy);
+    const [wx, wy] = isoUnprojectDelta(makeIsoView(size, cam.theta, cam.phi, cam.zoom), vx, vy);
     const m = Math.hypot(wx, wy) || 1;
     dir = [wx / m, wy / m];
   } else {
