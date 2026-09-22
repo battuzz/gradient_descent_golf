@@ -29,8 +29,13 @@ jobs:
           cache: npm
       - run: npm ci
       - name: Warn if Firebase config is missing
-        if: ${{ secrets.VITE_FIREBASE_API_KEY == '' || secrets.VITE_FIREBASE_PROJECT_ID == '' }}
-        run: echo "::warning::VITE_FIREBASE_API_KEY/PROJECT_ID secret is empty — this build will fall back to local demo mode instead of using Firestore."
+        env:
+          VITE_FIREBASE_API_KEY: ${{ secrets.VITE_FIREBASE_API_KEY }}
+          VITE_FIREBASE_PROJECT_ID: ${{ secrets.VITE_FIREBASE_PROJECT_ID }}
+        run: |
+          if [ -z "$VITE_FIREBASE_API_KEY" ] || [ -z "$VITE_FIREBASE_PROJECT_ID" ]; then
+            echo "::warning::VITE_FIREBASE_API_KEY/PROJECT_ID secret is empty — this build will fall back to local demo mode instead of using Firestore."
+          fi
       - run: npm run build
         env:
           VITE_FIREBASE_API_KEY: ${{ secrets.VITE_FIREBASE_API_KEY }}
