@@ -312,7 +312,9 @@ function Round({ event, name, diff, theme, onThemeChange, onAgain, onMenu }: {
     const to: Vec3 = [
       clamp(cur[0] + step[0] + gauss(r) * diff.landNoise, -1, 1),
       clamp(cur[1] + step[1] + gauss(r) * diff.landNoise, -1, 1),
-      ls.fourD ? clamp(wTarget + gauss(r) * diff.landNoise * 0.5, -1, 1) : 0,
+      // w is a deliberate, precise slider choice — unlike x/y it isn't subject to landing noise,
+      // so it only ever changes when the player actually moves the slider
+      ls.fourD ? clamp(wTarget, -1, 1) : 0,
     ];
     setFlight({ from: cur, to, t0: performance.now() });
   };
@@ -364,10 +366,10 @@ function Round({ event, name, diff, theme, onThemeChange, onAgain, onMenu }: {
 
   const shownPoints = useCountUp(points, done);
 
-  const zMin = Math.max(-1, cur[2] - W_STEP);
-  const zMax = Math.min(1, cur[2] + W_STEP);
-  const zHint = clamp(cur[2] - Math.sign(hint.gz) * Math.min(W_STEP, Math.abs(hint.gz) * 0.35), zMin, zMax);
-  const pct = (v: number) => ((v - zMin) / (zMax - zMin || 1)) * 100;
+  // the w-axis' own bounds are fixed for the whole round (not a window around the current
+  // position), so the slider track doesn't visually re-centre itself after every shot
+  const zHint = clamp(cur[2] - Math.sign(hint.gz) * Math.min(W_STEP, Math.abs(hint.gz) * 0.35), -1, 1);
+  const pct = (v: number) => ((v + 1) / 2) * 100;
 
   return (
     <div className="page play">
@@ -427,8 +429,8 @@ function Round({ event, name, diff, theme, onThemeChange, onAgain, onMenu }: {
               <div className="slider-track">
                 <input
                   type="range"
-                  min={zMin}
-                  max={zMax}
+                  min={-1}
+                  max={1}
                   step={0.01}
                   value={wTarget}
                   disabled={!!flight}
