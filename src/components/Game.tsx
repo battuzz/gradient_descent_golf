@@ -190,6 +190,29 @@ function FourDIntro({ onDismiss }: { onDismiss: () => void }) {
   );
 }
 
+/** Persistent legend beside the map: which colour is the minimum, which is the worst, and the
+ *  actual loss values at each end — so the heat-map never has to be read by memory alone. */
+function ColorBar({ theme, lo, hi }: { theme: PaletteId; lo: number; hi: number }) {
+  return (
+    <div className="color-bar">
+      <div className="color-bar-end">
+        <span className="color-bar-tag">min</span>
+        <span className="color-bar-value">{lo.toFixed(2)}</span>
+      </div>
+      <div
+        className="color-bar-track"
+        style={{ background: paletteSwatchCss(theme, 180) }}
+        role="img"
+        aria-label="Colour scale from lowest loss (best) at the top to highest loss (worst) at the bottom"
+      />
+      <div className="color-bar-end">
+        <span className="color-bar-tag">max</span>
+        <span className="color-bar-value">{hi.toFixed(2)}</span>
+      </div>
+    </div>
+  );
+}
+
 /** Lets players swap the heat-map colour scale for one that suits their colour vision. */
 function ThemePicker({ theme, onChange }: { theme: PaletteId; onChange: (t: PaletteId) => void }) {
   const [open, setOpen] = useState(false);
@@ -394,22 +417,25 @@ function Round({ event, name, diff, theme, onThemeChange, onAgain, onMenu }: {
         {ls.fourD && <Stat label="w" value={cur[2].toFixed(2)} />}
       </div>
 
-      <GameCanvas
-        ls={ls}
-        diff={diff}
-        theme={theme}
-        z={done ? cur[2] : wTarget}
-        path={path}
-        losses={losses}
-        reveals={reveals}
-        flight={flight}
-        hintDir={hint.dir}
-        autoAim={autoAim}
-        disabled={done || blocked}
-        revealAll={done}
-        onShoot={onShoot}
-        onLand={onLand}
-      />
+      <div className="canvas-row">
+        <GameCanvas
+          ls={ls}
+          diff={diff}
+          theme={theme}
+          z={done ? cur[2] : wTarget}
+          path={path}
+          losses={losses}
+          reveals={reveals}
+          flight={flight}
+          hintDir={hint.dir}
+          autoAim={autoAim}
+          disabled={done || blocked}
+          revealAll={done}
+          onShoot={onShoot}
+          onLand={onLand}
+        />
+        <ColorBar theme={theme} lo={ls.lo} hi={ls.hi} />
+      </div>
 
       {fourDPending ? (
         <FourDIntro onDismiss={dismissFourD} />

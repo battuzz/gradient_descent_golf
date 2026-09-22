@@ -71,10 +71,14 @@ function palette(stops: [number, [number, number, number]][], t: number): [numbe
   return stops[stops.length - 1][1];
 }
 
-/** CSS gradient string for a small swatch preview in the theme picker. */
-export function paletteSwatchCss(id: PaletteId): string {
+/**
+ * CSS gradient string for a swatch/colorbar preview. `angle` follows CSS linear-gradient
+ * convention: 90deg goes left→right (t=0 on the left), 180deg goes top→bottom (t=0 on top).
+ * t=0 is always the best/lowest-loss end of the scale, t=1 the worst/highest-loss end.
+ */
+export function paletteSwatchCss(id: PaletteId, angle = 90): string {
   const parts = PALETTES[id].stops.map(([t, [r, g, b]]) => `rgb(${r},${g},${b}) ${Math.round(t * 100)}%`);
-  return `linear-gradient(90deg, ${parts.join(', ')})`;
+  return `linear-gradient(${angle}deg, ${parts.join(', ')})`;
 }
 
 export function lossColor(ls: Landscape, v: number, theme: PaletteId): string {
