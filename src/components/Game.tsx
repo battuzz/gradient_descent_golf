@@ -196,18 +196,18 @@ function ColorBar({ theme, lo, hi }: { theme: PaletteId; lo: number; hi: number 
   return (
     <div className="color-bar">
       <div className="color-bar-end">
-        <span className="color-bar-tag">min</span>
-        <span className="color-bar-value">{lo.toFixed(2)}</span>
+        <span className="color-bar-tag">max</span>
+        <span className="color-bar-value">{hi.toFixed(2)}</span>
       </div>
       <div
         className="color-bar-track"
-        style={{ background: paletteSwatchCss(theme, 180) }}
+        style={{ background: paletteSwatchCss(theme, 0) }}
         role="img"
-        aria-label="Colour scale from lowest loss (best) at the top to highest loss (worst) at the bottom"
+        aria-label="Colour scale from highest loss (worst) at the top to lowest loss (best) at the bottom"
       />
       <div className="color-bar-end">
-        <span className="color-bar-tag">max</span>
-        <span className="color-bar-value">{hi.toFixed(2)}</span>
+        <span className="color-bar-tag">min</span>
+        <span className="color-bar-value">{lo.toFixed(2)}</span>
       </div>
     </div>
   );
