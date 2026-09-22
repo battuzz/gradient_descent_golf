@@ -122,7 +122,7 @@ const TUTORIAL_TIPS: { icon: string; text: string; legend?: boolean }[] = [
   { icon: '🖱️', text: 'Drag on the map to shoot — how far you drag sets the learning rate.' },
   {
     icon: '🎯', legend: true,
-    text: "This is the loss. Bright means good, dark means bad — aim for the brightest colour, that's the minimum!",
+    text: "This is the loss. Bright means good, dark means bad — aim for the brightest colour, that's the minimum! Colours hard to tell apart? Change the theme with 🎨 in the top right.",
   },
   {
     icon: '➤',
