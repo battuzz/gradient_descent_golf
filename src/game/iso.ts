@@ -1,12 +1,20 @@
 /**
  * General rotatable orthographic projection used by the 3D landscape view. World (x, y) live
- * in [-1, 1]; `h` is a normalised elevation in [0, 1] (0 = valley floor, 1 = tallest peak).
+ * in [-1, 1]; `h` is a normalised elevation in [0, 1] (0 = valley floor, 1 = tallest peak — so
+ * the global minimum, which is always elevation 0, sits at the bottom of a valley).
  *
  * The camera has two angles — azimuth `theta` (spin around the vertical axis) and pitch `phi`
- * (how far you're looking down from the side) — plus a `zoom` multiplier. The ground-plane part
- * of the projection (h = 0) is theta's rotation matrix (orthonormal, so its inverse is its own
- * transpose) composed with a phi-dependent foreshortening; that's what lets a screen-space drag
- * be turned back into a world-space aim direction in 3D mode (see isoUnprojectDelta).
+ * (how far you're looking down from the side) — plus a `zoom` multiplier. Screen position comes
+ * from projecting the world point onto the camera's "right" and "up" basis vectors:
+ *
+ *   right = (sinT, -cosT, 0)
+ *   up    = (-cosT sinP, -sinT sinP, cosP)
+ *
+ * (`up` is what makes height read as height: at phi = 0, up = (0, 0, 1), so elevation maps
+ * straight onto the screen's vertical axis, the way a side-on view should look.) The ground
+ * plane's part of this (h = 0) is an orthonormal rotation, so its inverse is its own transpose —
+ * that's what lets a screen-space drag be turned back into a world-space aim direction in 3D
+ * mode (see isoUnprojectDelta).
  */
 export interface IsoView {
   cosT: number; sinT: number; cosP: number; sinP: number;
@@ -39,29 +47,27 @@ export function makeIsoView(S: number, theta: number, phi: number, zoom: number)
 
 export function isoProject(v: IsoView, x: number, y: number, h: number): [number, number] {
   const hw = h * HEIGHT_WORLD_SCALE;
-  const xc1 = x * v.cosT - y * v.sinT;
-  const yc1 = x * v.sinT + y * v.cosT;
-  const yc = yc1 * v.cosP - hw * v.sinP;
-  return [v.ox + xc1 * v.scale, v.oy - yc * v.scale];
+  const right = x * v.sinT - y * v.cosT;
+  const up = -v.sinP * (x * v.cosT + y * v.sinT) + hw * v.cosP;
+  return [v.ox + right * v.scale, v.oy - up * v.scale];
 }
 
-/** Camera-space depth (larger = farther) — used to paint the terrain back-to-front. */
+/** Camera-space distance from the camera (larger = farther) — paints the terrain back-to-front. */
 export function isoDepth(v: IsoView, x: number, y: number, h: number): number {
   const hw = h * HEIGHT_WORLD_SCALE;
-  const yc1 = x * v.sinT + y * v.cosT;
-  return yc1 * v.sinP + hw * v.cosP;
+  return -(v.cosP * (x * v.cosT + y * v.sinT) + hw * v.sinP);
 }
 
 /** Projects a direction vector (not a position) — used for the gradient-hint arrow. */
 export function isoProjectDir(v: IsoView, dx: number, dy: number): [number, number] {
-  const xc1 = dx * v.cosT - dy * v.sinT;
-  const yc1 = dx * v.sinT + dy * v.cosT;
-  return [xc1 * v.scale, -yc1 * v.cosP * v.scale];
+  const right = dx * v.sinT - dy * v.cosT;
+  const up = -v.sinP * (dx * v.cosT + dy * v.sinT);
+  return [right * v.scale, -up * v.scale];
 }
 
 /** Inverts the ground-plane (h = 0) projection to turn a screen drag into a world (x, y) delta. */
 export function isoUnprojectDelta(v: IsoView, dpx: number, dpy: number): [number, number] {
   const a = dpx / v.scale;
-  const b = -dpy / (v.scale * v.cosP);
-  return [v.cosT * a + v.sinT * b, -v.sinT * a + v.cosT * b];
+  const b = dpy / (v.scale * v.sinP);
+  return [v.sinT * a + v.cosT * b, -v.cosT * a + v.sinT * b];
 }
