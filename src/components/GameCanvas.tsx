@@ -49,8 +49,10 @@ interface Props {
   disabled: boolean;
   revealAll: boolean;
   view3d: boolean;
+  onView3DChange: (v: boolean) => void;
   /** 'aim' drags shoot (default); 'pan' drags orbit the camera instead — only meaningful in 3D */
   camMode: 'aim' | 'pan';
+  onCamModeChange: (m: 'aim' | 'pan') => void;
   onShoot: (step: [number, number]) => void;
   onLand: () => void;
 }
@@ -437,9 +439,35 @@ export function GameCanvas(props: Props) {
     return () => cancelAnimationFrame(raf);
   }, []);
 
+  const panning = props.view3d && props.camMode === 'pan';
   return (
-    <div className="canvas-wrap" ref={wrapRef}>
+    <div className={`canvas-wrap${panning ? ' pan-mode' : ''}`} ref={wrapRef}>
       <canvas ref={canvasRef} className="game-canvas" />
+
+      <div className="view-controls" role="group" aria-label={props.t.camControlsAria}>
+        <button
+          onClick={() => props.onView3DChange(!props.view3d)}
+          aria-label={props.t.toggle3DAria}
+          aria-pressed={props.view3d}
+        >
+          {props.view3d ? '🗻' : '🗺️'}
+        </button>
+        {props.view3d && (
+          <button
+            className={panning ? 'pan-active' : ''}
+            onClick={() => props.onCamModeChange(panning ? 'aim' : 'pan')}
+            aria-label={props.t.toggleCamModeAria}
+            aria-pressed={panning}
+          >
+            {panning ? '🧭' : '🎯'}
+          </button>
+        )}
+      </div>
+
+      {panning && (
+        <div className="mode-badge">🧭 {props.t.panModeBadge}</div>
+      )}
+
       {props.view3d && (
         <div className="cam-controls" role="group" aria-label={props.t.camControlsAria}>
           <button onClick={() => rotateCam(-ROT_STEP)} aria-label={props.t.rotateLeftAria}>◂</button>

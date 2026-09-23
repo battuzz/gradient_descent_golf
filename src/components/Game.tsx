@@ -410,24 +410,6 @@ function Round({ event, name, diff, theme, onThemeChange, view3d, onView3DChange
             <i key={i} className={i < shotsTaken ? 'used' : ''} />
           ))}
         </div>
-        <button
-          className="icon-btn"
-          onClick={() => onView3DChange(!view3d)}
-          aria-label={t.toggle3DAria}
-          aria-pressed={view3d}
-        >
-          {view3d ? '🗻' : '🗺️'}
-        </button>
-        {view3d && (
-          <button
-            className="icon-btn"
-            onClick={() => setCamMode((m) => (m === 'aim' ? 'pan' : 'aim'))}
-            aria-label={t.toggleCamModeAria}
-            aria-pressed={camMode === 'pan'}
-          >
-            {camMode === 'aim' ? '🎯' : '🧭'}
-          </button>
-        )}
         <ThemePicker theme={theme} onChange={onThemeChange} />
       </div>
 
@@ -454,7 +436,9 @@ function Round({ event, name, diff, theme, onThemeChange, view3d, onView3DChange
           disabled={done || blocked}
           revealAll={done}
           view3d={view3d}
+          onView3DChange={onView3DChange}
           camMode={camMode}
+          onCamModeChange={setCamMode}
           onShoot={onShoot}
           onLand={onLand}
         />

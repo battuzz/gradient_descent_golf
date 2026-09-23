@@ -69,6 +69,7 @@ export interface Dict {
   resetViewAria: string;
   toggleCamModeAria: string;
   dragToPanHint: string;
+  panModeBadge: string;
 
   // ---- round HUD
   backAria: string;
@@ -170,6 +171,7 @@ const en: Dict = {
   resetViewAria: 'Reset 3D view',
   toggleCamModeAria: 'Switch between throw mode and pan/zoom mode',
   dragToPanHint: 'Drag to rotate the view · pinch or scroll to zoom',
+  panModeBadge: 'Pan & zoom mode',
 
   backAria: 'Back',
   statLossNow: 'Loss now',
@@ -269,6 +271,7 @@ const it: Dict = {
   resetViewAria: 'Ripristina la vista 3D',
   toggleCamModeAria: 'Passa dalla modalità tiro alla modalità pan/zoom',
   dragToPanHint: 'Trascina per ruotare la vista · pizzica o scorri per zoomare',
+  panModeBadge: 'Modalità pan e zoom',
 
   backAria: 'Indietro',
   statLossNow: 'Loss attuale',
