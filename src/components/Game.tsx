@@ -324,6 +324,8 @@ function Round({
   const [reveals, setReveals] = useState<Vec3[]>(() => [ls.start]);
   const [flight, setFlight] = useState<Flight | null>(null);
   const [wTarget, setWTarget] = useState(ls.start[2]);
+  // after the round, the revealed map can be browsed slice by slice; null = the ball's own slice
+  const [recapW, setRecapW] = useState<number | null>(null);
   const [autoAim, setAutoAim] = useState(diff.autoAim);
   const [earlyStop, setEarlyStop] = useState(false);
   const [confirmStop, setConfirmStop] = useState(false);
@@ -498,7 +500,7 @@ function Round({
           diff={diff}
           theme={theme}
           t={t}
-          z={done ? cur[2] : wTarget}
+          z={done ? recapW ?? cur[2] : wTarget}
           path={path}
           losses={losses}
           reveals={reveals}
@@ -576,6 +578,29 @@ function Round({
               <> · {t.finishedEarly(shotsTaken, diff.shots)}</>
             )}
           </div>
+          {ls.fourD && (
+            <div className="slider recap-slider">
+              <div className="slider-label">
+                <span>{t.exploreWLabel}: <b>w</b> = {(recapW ?? cur[2]).toFixed(2)}</span>
+                <span className="row gap-sm">
+                  <button className="chip" onClick={() => setRecapW(null)}>{t.yourWBtn}</button>
+                  <button className="chip goal" onClick={() => setRecapW(ls.best[2])}>{t.goalWBtn}</button>
+                </span>
+              </div>
+              <div className="slider-track">
+                <input
+                  type="range"
+                  min={-1}
+                  max={1}
+                  step={0.01}
+                  value={recapW ?? cur[2]}
+                  onChange={(e) => setRecapW(Number(e.target.value))}
+                />
+                <span className="tick now" style={{ left: `${pct(cur[2])}%` }} title={t.yourWBtn} />
+                <span className="tick goal" style={{ left: `${pct(ls.best[2])}%` }} title={t.goalWBtn} />
+              </div>
+            </div>
+          )}
           <div className={`status ${status}`}>
             {status === 'sending' && t.publishing}
             {status === 'ok' && (myRank ? t.publishedRank(myRank.pos, myRank.total) : t.publishedNoRank)}

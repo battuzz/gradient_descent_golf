@@ -104,6 +104,10 @@ export interface Dict {
   // ---- canvas-drawn labels
   previewingLabel: (v: string) => string;
   goalAtLabel: (v: string) => string;
+  sliceLabel: (v: string) => string;
+  exploreWLabel: string;
+  yourWBtn: string;
+  goalWBtn: string;
 }
 
 const en: Dict = {
@@ -204,6 +208,10 @@ const en: Dict = {
 
   previewingLabel: (v) => `previewing w = ${v}`,
   goalAtLabel: (v) => `goal at w=${v}`,
+  sliceLabel: (v) => `slice w = ${v}`,
+  exploreWLabel: 'Explore',
+  yourWBtn: 'your w',
+  goalWBtn: 'goal w',
 };
 
 const it: Dict = {
@@ -305,6 +313,10 @@ const it: Dict = {
 
   previewingLabel: (v) => `anteprima w = ${v}`,
   goalAtLabel: (v) => `obiettivo a w=${v}`,
+  sliceLabel: (v) => `sezione w = ${v}`,
+  exploreWLabel: 'Esplora',
+  yourWBtn: 'la tua w',
+  goalWBtn: 'w obiettivo',
 };
 
 const DICTS: Record<Lang, Dict> = { en, it };
