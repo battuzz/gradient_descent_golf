@@ -49,6 +49,8 @@ interface Props {
   disabled: boolean;
   revealAll: boolean;
   view3d: boolean;
+  /** 'aim' drags shoot (default); 'pan' drags orbit the camera instead — only meaningful in 3D */
+  camMode: 'aim' | 'pan';
   onShoot: (step: [number, number]) => void;
   onLand: () => void;
 }
@@ -115,52 +117,53 @@ export function GameCanvas(props: Props) {
     return () => ro.disconnect();
   }, []);
 
-  // ----- pointer input: one finger/pointer aims and shoots (unchanged); a second finger
-  // switches to orbiting the 3D camera (drag to rotate/tilt, pinch to zoom) instead, so the two
-  // gestures never fight over the same touch.
+  // ----- pointer input. Two explicit modes (switched via the button in the topbar), rather
+  // than splitting behaviour by finger count, so dragging always does one predictable thing:
+  //  - 'aim' (default): drag shoots, exactly like the 2D view. Extra fingers are ignored.
+  //  - 'pan' (3D only): drag orbits the camera (horizontal = rotate, vertical = tilt); a second
+  //    finger switches to pinch-to-zoom instead.
   useEffect(() => {
     const canvas = canvasRef.current!;
     const pointers = new Map<number, { x: number; y: number }>();
-    let camGesture: {
-      dist: number; midX: number; midY: number; theta: number; phi: number; zoom: number;
-    } | null = null;
+    let orbitDrag: { sx: number; sy: number; theta: number; phi: number } | null = null;
+    let pinch: { dist: number; zoom: number } | null = null;
 
     const rel = (e: PointerEvent) => {
       const r = canvas.getBoundingClientRect();
       return [e.clientX - r.left, e.clientY - r.top] as const;
     };
-    const twoPointerStats = () => {
+    const pinchDist = () => {
       const [a, b] = [...pointers.values()];
-      return {
-        dist: Math.hypot(a.x - b.x, a.y - b.y) || 1,
-        midX: (a.x + b.x) / 2,
-        midY: (a.y + b.y) / 2,
-      };
+      return Math.hypot(a.x - b.x, a.y - b.y) || 1;
     };
     const down = (e: PointerEvent) => {
       const [x, y] = rel(e);
       pointers.set(e.pointerId, { x, y });
       canvas.setPointerCapture(e.pointerId);
-      if (pointers.size === 1) {
-        const p = propsRef.current;
+      const p = propsRef.current;
+      if (p.view3d && p.camMode === 'pan') {
+        if (pointers.size === 1) {
+          const cam = camRef.current;
+          orbitDrag = { sx: x, sy: y, theta: cam.tTheta, phi: cam.tPhi };
+        } else if (pointers.size === 2) {
+          orbitDrag = null; // a second finger switches from orbit-drag to pinch-zoom
+          pinch = { dist: pinchDist(), zoom: camRef.current.tZoom };
+        }
+      } else if (pointers.size === 1) {
         if (p.disabled || p.flight) return;
         aimRef.current = { sx: x, sy: y, cx: x, cy: y };
-      } else if (pointers.size === 2) {
-        aimRef.current = null; // a second touch always cancels an in-progress aim
-        const cam = camRef.current;
-        camGesture = { ...twoPointerStats(), theta: cam.tTheta, phi: cam.tPhi, zoom: cam.tZoom };
       }
     };
     const move = (e: PointerEvent) => {
       if (!pointers.has(e.pointerId)) return;
       const [x, y] = rel(e);
       pointers.set(e.pointerId, { x, y });
-      if (pointers.size === 2 && camGesture && propsRef.current.view3d) {
-        const { dist, midX, midY } = twoPointerStats();
+      if (pointers.size === 2 && pinch) {
+        camRef.current.tZoom = clampZoom(pinch.zoom * (pinchDist() / pinch.dist));
+      } else if (orbitDrag) {
         const cam = camRef.current;
-        cam.tTheta = camGesture.theta + (midX - camGesture.midX) * 0.012;
-        cam.tPhi = clampPhi(camGesture.phi - (midY - camGesture.midY) * 0.008);
-        cam.tZoom = clampZoom(camGesture.zoom * (dist / camGesture.dist));
+        cam.tTheta = orbitDrag.theta + (x - orbitDrag.sx) * 0.012;
+        cam.tPhi = clampPhi(orbitDrag.phi - (y - orbitDrag.sy) * 0.008);
       } else if (aimRef.current) {
         aimRef.current.cx = x;
         aimRef.current.cy = y;
@@ -168,8 +171,9 @@ export function GameCanvas(props: Props) {
     };
     const release = (e: PointerEvent) => {
       pointers.delete(e.pointerId);
-      if (pointers.size < 2) camGesture = null;
+      if (pointers.size < 2) pinch = null;
       if (pointers.size === 0) {
+        orbitDrag = null;
         const a = aimRef.current;
         aimRef.current = null;
         if (a) {

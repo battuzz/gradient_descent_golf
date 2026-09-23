@@ -261,6 +261,7 @@ function Round({ event, name, diff, theme, onThemeChange, view3d, onView3DChange
   const [flight, setFlight] = useState<Flight | null>(null);
   const [wTarget, setWTarget] = useState(ls.start[2]);
   const [autoAim, setAutoAim] = useState(diff.autoAim);
+  const [camMode, setCamMode] = useState<'aim' | 'pan'>('aim');
   const [earlyStop, setEarlyStop] = useState(false);
   const [confirmStop, setConfirmStop] = useState(false);
   const confirmTimer = useRef<number | undefined>(undefined);
@@ -417,6 +418,16 @@ function Round({ event, name, diff, theme, onThemeChange, view3d, onView3DChange
         >
           {view3d ? '🗻' : '🗺️'}
         </button>
+        {view3d && (
+          <button
+            className="icon-btn"
+            onClick={() => setCamMode((m) => (m === 'aim' ? 'pan' : 'aim'))}
+            aria-label={t.toggleCamModeAria}
+            aria-pressed={camMode === 'pan'}
+          >
+            {camMode === 'aim' ? '🎯' : '🧭'}
+          </button>
+        )}
         <ThemePicker theme={theme} onChange={onThemeChange} />
       </div>
 
@@ -443,6 +454,7 @@ function Round({ event, name, diff, theme, onThemeChange, view3d, onView3DChange
           disabled={done || blocked}
           revealAll={done}
           view3d={view3d}
+          camMode={camMode}
           onShoot={onShoot}
           onLand={onLand}
         />
@@ -484,7 +496,9 @@ function Round({ event, name, diff, theme, onThemeChange, view3d, onView3DChange
               <span className="knob" /> {t.autoAimToggle}
             </button>
             <span className="muted small">
-              {shotsTaken === 0 ? t.dragToShootHint : t.shotsLeftText(diff.shots - shotsTaken)}
+              {view3d && camMode === 'pan'
+                ? t.dragToPanHint
+                : shotsTaken === 0 ? t.dragToShootHint : t.shotsLeftText(diff.shots - shotsTaken)}
             </span>
           </div>
           {shotsTaken > 0 && (
