@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import {
   DIFFICULTIES, buildLandscape, computePoints, gauss, getDifficulty, hashString, rng,
   type Difficulty, type Vec3,
@@ -14,9 +14,36 @@ const TUTORIAL_KEY = 'gdg.tutorialSeen';
 const FOURD_KEY = 'gdg.tutorial4dSeen';
 const THEME_KEY = 'gdg.theme';
 const VIEW3D_KEY = 'gdg.view3d';
+const FULLSCREEN_KEY = 'gdg.fullscreen';
 const W_STEP = 0.5; // max change of the 4th parameter per shot
 
 const clamp = (v: number, a: number, b: number) => Math.min(b, Math.max(a, v));
+
+// ----- browser Fullscreen API (with the webkit-prefixed variant older Safari/iPad still needs).
+// Not every browser has it (notably iPhone Safari), so the immersive full-viewport layout is what
+// actually makes the map big; real fullscreen just also hides the browser chrome where possible.
+type FsDoc = Document & { webkitFullscreenElement?: Element | null; webkitExitFullscreen?: () => void };
+type FsEl = HTMLElement & { webkitRequestFullscreen?: () => void };
+const fullscreenActive = () => {
+  const d = document as FsDoc;
+  return !!(d.fullscreenElement ?? d.webkitFullscreenElement);
+};
+function enterFullscreen() {
+  const el = document.documentElement as FsEl;
+  if (fullscreenActive()) return;
+  try {
+    if (el.requestFullscreen) el.requestFullscreen({ navigationUI: 'hide' }).catch(() => { /* denied: layout still fills the viewport */ });
+    else el.webkitRequestFullscreen?.();
+  } catch { /* ignore */ }
+}
+function exitFullscreen() {
+  const d = document as FsDoc;
+  if (!fullscreenActive()) return;
+  try {
+    if (d.exitFullscreen) d.exitFullscreen().catch(() => { /* ignore */ });
+    else d.webkitExitFullscreen?.();
+  } catch { /* ignore */ }
+}
 
 const isPaletteId = (v: string | null): v is PaletteId => !!v && (PALETTE_IDS as string[]).includes(v);
 
@@ -42,6 +69,23 @@ export function Game({ event }: { event: string }) {
     try { localStorage.setItem(VIEW3D_KEY, v ? '1' : '0'); } catch { /* ignore */ }
   };
 
+  // full screen is the default: the map gets the whole viewport instead of a narrow column
+  const [fullscreen, setFullscreen] = useState<boolean>(() => {
+    try { return localStorage.getItem(FULLSCREEN_KEY) !== '0'; } catch { return true; }
+  });
+  // must run inside a click handler: browsers only grant fullscreen in response to a user gesture
+  const toggleFullscreen = () => {
+    const v = !fullscreen;
+    setFullscreen(v);
+    try { localStorage.setItem(FULLSCREEN_KEY, v ? '1' : '0'); } catch { /* ignore */ }
+    if (v) enterFullscreen(); else exitFullscreen();
+  };
+  // leaving the round (back to the menu, or navigating away) also leaves browser fullscreen
+  useEffect(() => {
+    if (!diffId) exitFullscreen();
+  }, [diffId]);
+  useEffect(() => () => exitFullscreen(), []);
+
   if (!diffId) {
     return (
       <Setup
@@ -50,6 +94,7 @@ export function Game({ event }: { event: string }) {
         setName={setName}
         onStart={(d) => {
           localStorage.setItem(NAME_KEY, name.trim());
+          if (fullscreen) enterFullscreen();
           setDiffId(d);
         }}
       />
@@ -65,6 +110,8 @@ export function Game({ event }: { event: string }) {
       onThemeChange={changeTheme}
       view3d={view3d}
       onView3DChange={changeView3d}
+      fullscreen={fullscreen}
+      onToggleFullscreen={toggleFullscreen}
       onAgain={() => setRound((r) => r + 1)}
       onMenu={() => setDiffId(null)}
     />
@@ -200,7 +247,10 @@ function ColorBar({ theme, lo, hi }: { theme: PaletteId; lo: number; hi: number 
       </div>
       <div
         className="color-bar-track"
-        style={{ background: paletteSwatchCss(theme, 0) }}
+        style={{
+          '--bar-v': paletteSwatchCss(theme, 0),
+          '--bar-h': paletteSwatchCss(theme, 90),
+        } as CSSProperties}
         role="img"
         aria-label={t.colorBarAria}
       />
@@ -209,6 +259,17 @@ function ColorBar({ theme, lo, hi }: { theme: PaletteId; lo: number; hi: number 
         <span className="color-bar-value">{lo.toFixed(2)}</span>
       </div>
     </div>
+  );
+}
+
+function FullscreenIcon({ exit }: { exit: boolean }) {
+  return (
+    <svg className="fs-icon" viewBox="0 0 24 24" aria-hidden="true">
+      <path d={exit
+        ? 'M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5'
+        : 'M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5'}
+      />
+    </svg>
   );
 }
 
@@ -246,9 +307,12 @@ function ThemePicker({ theme, onChange }: { theme: PaletteId; onChange: (t: Pale
 
 // ---------------------------------------------------------------- round
 
-function Round({ event, name, diff, theme, onThemeChange, view3d, onView3DChange, onAgain, onMenu }: {
+function Round({
+  event, name, diff, theme, onThemeChange, view3d, onView3DChange, fullscreen, onToggleFullscreen, onAgain, onMenu,
+}: {
   event: string; name: string; diff: Difficulty; theme: PaletteId; onThemeChange: (t: PaletteId) => void;
   view3d: boolean; onView3DChange: (v: boolean) => void;
+  fullscreen: boolean; onToggleFullscreen: () => void;
   onAgain: () => void; onMenu: () => void;
 }) {
   const { t } = useLang();
@@ -397,7 +461,7 @@ function Round({ event, name, diff, theme, onThemeChange, view3d, onView3DChange
   const pct = (v: number) => ((v + 1) / 2) * 100;
 
   return (
-    <div className="page play">
+    <div className={`page play${fullscreen ? ' immersive' : ''}`}>
       <div className="topbar">
         <button className="icon-btn" onClick={onMenu} aria-label={t.backAria}>←</button>
         <div className="title">
@@ -410,6 +474,15 @@ function Round({ event, name, diff, theme, onThemeChange, view3d, onView3DChange
           ))}
         </div>
         <ThemePicker theme={theme} onChange={onThemeChange} />
+        <button
+          className="icon-btn"
+          onClick={onToggleFullscreen}
+          aria-label={fullscreen ? t.exitFullscreenAria : t.enterFullscreenAria}
+          aria-pressed={fullscreen}
+          title={fullscreen ? t.exitFullscreenAria : t.enterFullscreenAria}
+        >
+          <FullscreenIcon exit={fullscreen} />
+        </button>
       </div>
 
       <div className="stats">

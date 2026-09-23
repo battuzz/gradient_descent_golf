@@ -69,6 +69,8 @@ export interface Dict {
   resetViewAria: string;
   dragToPanHint: string;
   panModeBadge: string;
+  enterFullscreenAria: string;
+  exitFullscreenAria: string;
 
   // ---- round HUD
   backAria: string;
@@ -170,6 +172,8 @@ const en: Dict = {
   resetViewAria: 'Reset 3D view',
   dragToPanHint: 'Drag to rotate the view · pinch or scroll to zoom',
   panModeBadge: 'Pan & zoom mode',
+  enterFullscreenAria: 'Play in full screen',
+  exitFullscreenAria: 'Exit full screen',
 
   backAria: 'Back',
   statLossNow: 'Loss now',
@@ -269,6 +273,8 @@ const it: Dict = {
   resetViewAria: 'Ripristina la vista 3D',
   dragToPanHint: 'Trascina per ruotare la vista · pizzica o scorri per zoomare',
   panModeBadge: 'Modalità pan e zoom',
+  enterFullscreenAria: 'Gioca a schermo intero',
+  exitFullscreenAria: 'Esci dallo schermo intero',
 
   backAria: 'Indietro',
   statLossNow: 'Loss attuale',
