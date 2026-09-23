@@ -22,7 +22,7 @@ body {
   -webkit-tap-highlight-color: transparent;
   overscroll-behavior: none;
 }
-#root { min-height: 100vh; display: flex; flex-direction: column; }
+#root { min-height: 100vh; min-height: 100dvh; display: flex; flex-direction: column; }
 button { font: inherit; color: inherit; }
 input { font: inherit; color: inherit; }
 
@@ -184,6 +184,11 @@ h1 { font-size: 22px; margin: 8px 0 4px; letter-spacing: -0.02em; }
 .color-bar-value { font-size: 11px; font-weight: 700; }
 .color-bar-track {
   flex: 1; width: 14px; border-radius: 7px; border: 1px solid rgba(255,255,255,0.15);
+  background: var(--bar-v);
+}
+.fs-icon {
+  width: 18px; height: 18px; display: block; margin: auto;
+  fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round;
 }
 
 /* ---------- controls ---------- */
@@ -393,3 +398,69 @@ h1 { font-size: 22px; margin: 8px 0 4px; letter-spacing: -0.02em; }
   to { opacity: 1; transform: scale(1); }
 }
 
+
+/* ---------- immersive (full screen) play layout ----------
+   The default. The round takes the whole viewport, and the map becomes the largest square that
+   fits whatever space the HUD leaves: below the HUD in portrait, beside it in landscape. */
+body:has(.page.play.immersive) { overflow: hidden; }
+body:has(.page.play.immersive) .lang-switch { display: none; }
+
+.page.play.immersive {
+  --bar: 34px; /* colour-bar thickness */
+  flex: none;
+  max-width: none;
+  height: 100vh;
+  height: 100dvh;
+  overflow: hidden;
+  padding:
+    max(8px, env(safe-area-inset-top)) max(8px, env(safe-area-inset-right))
+    max(8px, env(safe-area-inset-bottom)) max(8px, env(safe-area-inset-left));
+  gap: 8px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: auto auto minmax(0, 1fr) auto;
+  grid-template-areas: "top" "stats" "map" "hud";
+}
+.immersive .topbar { grid-area: top; }
+.immersive .stats { grid-area: stats; gap: 6px; }
+.immersive .stat { padding: 5px 8px; border-radius: 10px; }
+.immersive .stat b { font-size: 15px; }
+.immersive .controls, .immersive .result { grid-area: hud; gap: 8px; min-height: 0; overflow-y: auto; }
+.immersive .result .row { flex-wrap: wrap; }
+.immersive .spark { height: 32px; }
+
+/* the map cell is a size container, so the canvas can be sized against both of its dimensions */
+.immersive .canvas-row {
+  grid-area: map; min-height: 0; container-type: size;
+  flex-direction: column; align-items: center; justify-content: center; gap: 6px;
+}
+.immersive .canvas-wrap {
+  flex: none;
+  width: min(100cqw, 100cqh - var(--bar) - 6px);
+}
+/* portrait: the colour scale runs horizontally under the map (min on the left) so the map can
+   use the full screen width */
+.immersive .color-bar {
+  width: min(100cqw, 100cqh - var(--bar) - 6px); height: var(--bar);
+  flex-direction: row-reverse; gap: 8px;
+}
+.immersive .color-bar-end { flex-direction: row; gap: 4px; align-items: baseline; }
+.immersive .color-bar-track { width: auto; height: 12px; align-self: center; background: var(--bar-h); }
+
+@media (orientation: landscape) {
+  .page.play.immersive {
+    grid-template-columns: minmax(0, 1fr) minmax(250px, 340px);
+    grid-template-rows: auto auto minmax(0, 1fr);
+    grid-template-areas: "map top" "map stats" "map hud";
+    column-gap: 12px;
+  }
+  .immersive .controls, .immersive .result { justify-content: flex-start; }
+  .immersive .canvas-row { flex-direction: row; }
+  .immersive .canvas-wrap { width: min(100cqw - var(--bar) - 6px, 100cqh); }
+  .immersive .color-bar {
+    width: var(--bar); height: min(100cqw - var(--bar) - 6px, 100cqh);
+    flex-direction: column; gap: 4px;
+  }
+  .immersive .color-bar-end { flex-direction: column; gap: 1px; align-items: center; }
+  .immersive .color-bar-track { width: 12px; height: auto; align-self: auto; background: var(--bar-v); }
+}
