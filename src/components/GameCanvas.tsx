@@ -1,11 +1,35 @@
 import { useEffect, useRef } from 'react';
 import type { Difficulty, Landscape, Vec3 } from '../game/landscape';
-import { lossColor, paintHeat, RES, type PaletteId } from '../game/render';
+import { buildTerrainMesh, drawTerrainMesh, lossColor, paintHeat, RES, type PaletteId, type TerrainMesh } from '../game/render';
+import { isoProject, isoProjectDir, makeIsoView, type IsoView } from '../game/iso';
 import type { Dict } from '../lib/i18n';
+
+const clamp01 = (v: number) => (v < 0 ? 0 : v > 1 ? 1 : v);
+const clamp = (v: number, a: number, b: number) => Math.min(b, Math.max(a, v));
 
 export const MAX_STEP = 0.8; // world units of a full-power (lr = 1) shot
 const FLIGHT_MS = 750;
 const DEAD_ZONE = 14; // px: drags shorter than this cancel the shot
+
+// ----- 3D camera: azimuth (theta) + pitch (phi) + zoom, orbited by the user
+const CAM_THETA0 = Math.PI / 4;
+const CAM_PHI0 = Math.atan(0.55);
+const CAM_ZOOM0 = 1;
+const PHI_MIN = (12 * Math.PI) / 180;
+const PHI_MAX = (80 * Math.PI) / 180;
+const ZOOM_MIN = 0.55;
+const ZOOM_MAX = 2.6;
+const CAM_LERP = 0.18; // per-frame smoothing toward the target angle/zoom
+const ROT_STEP = Math.PI / 8; // 22.5° per button click
+const ZOOM_STEP = 1.25; // per button click
+const clampPhi = (p: number) => clamp(p, PHI_MIN, PHI_MAX);
+const clampZoom = (z: number) => clamp(z, ZOOM_MIN, ZOOM_MAX);
+
+interface CamState { theta: number; phi: number; zoom: number; tTheta: number; tPhi: number; tZoom: number }
+const initialCam = (): CamState => ({
+  theta: CAM_THETA0, phi: CAM_PHI0, zoom: CAM_ZOOM0,
+  tTheta: CAM_THETA0, tPhi: CAM_PHI0, tZoom: CAM_ZOOM0,
+});
 
 export interface Flight { from: Vec3; to: Vec3; t0: number }
 
@@ -24,6 +48,9 @@ interface Props {
   autoAim: boolean;
   disabled: boolean;
   revealAll: boolean;
+  /** 2D top-down heat-map (drag aims and shoots) vs 3D relief (drag orbits the camera instead) */
+  view3d: boolean;
+  onView3DChange: (v: boolean) => void;
   onShoot: (step: [number, number]) => void;
   onLand: () => void;
 }
@@ -34,31 +61,44 @@ export function GameCanvas(props: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
   const heatRef = useRef<HTMLCanvasElement | null>(null);
+  const meshRef = useRef<TerrainMesh | null>(null);
   const propsRef = useRef(props);
   propsRef.current = props;
   const aimRef = useRef<{ sx: number; sy: number; cx: number; cy: number } | null>(null);
   const landedRef = useRef<Flight | null>(null);
   const sizeRef = useRef({ css: 300, dpr: 1 });
+  const camRef = useRef<CamState>(initialCam());
 
-  // ----- heat-map layer (recomputed only when the revealed area / slice changes)
+  // ----- terrain layer: a flat heat-map, or a 3D relief mesh. Building it (loss/palette
+  // sampling) only happens when the revealed area / slice / view mode changes; the 3D mesh is
+  // then reprojected every frame at whatever camera angle/zoom is current (see the render loop).
   useEffect(() => {
-    let off = heatRef.current;
-    if (!off) {
-      off = document.createElement('canvas');
-      off.width = off.height = RES;
-      heatRef.current = off;
-    }
-    const octx = off.getContext('2d')!;
-    const img = octx.createImageData(RES, RES);
-    // the finished round always reveals cleanly (no stippling) so the recap map reads well
-    const pixelSample = props.revealAll ? 1 : props.diff.pixelSample;
     const ball = props.path[props.path.length - 1];
-    paintHeat(
-      img, props.ls, props.z, props.reveals, [ball[0], ball[1]],
-      props.diff.vision, props.revealAll, pixelSample, props.theme,
-    );
-    octx.putImageData(img, 0, 0);
-  }, [props.ls, props.z, props.reveals, props.path, props.diff.vision, props.diff.pixelSample, props.revealAll, props.theme]);
+    if (props.view3d) {
+      meshRef.current = buildTerrainMesh(
+        props.ls, props.z, props.reveals, [ball[0], ball[1]], props.diff.vision, props.revealAll, props.theme,
+      );
+    } else {
+      let off = heatRef.current;
+      if (!off) {
+        off = document.createElement('canvas');
+        off.width = off.height = RES;
+        heatRef.current = off;
+      }
+      const octx = off.getContext('2d')!;
+      const img = octx.createImageData(RES, RES);
+      // the finished round always reveals cleanly (no stippling) so the recap map reads well
+      const pixelSample = props.revealAll ? 1 : props.diff.pixelSample;
+      paintHeat(
+        img, props.ls, props.z, props.reveals, [ball[0], ball[1]],
+        props.diff.vision, props.revealAll, pixelSample, props.theme,
+      );
+      octx.putImageData(img, 0, 0);
+    }
+  }, [
+    props.ls, props.z, props.reveals, props.path, props.diff.vision, props.diff.pixelSample,
+    props.revealAll, props.theme, props.view3d,
+  ]);
 
   // ----- sizing
   useEffect(() => {
@@ -77,43 +117,96 @@ export function GameCanvas(props: Props) {
     return () => ro.disconnect();
   }, []);
 
-  // ----- pointer input
+  // ----- pointer input. The view itself picks the gesture, so dragging always does one
+  // predictable thing:
+  //  - 2D top-down heat-map: drag aims and shoots. Extra fingers are ignored.
+  //  - 3D relief: drag orbits the camera (horizontal = rotate, vertical = tilt); a second
+  //    finger switches to pinch-to-zoom instead. Aiming isn't possible in this view.
   useEffect(() => {
     const canvas = canvasRef.current!;
+    const pointers = new Map<number, { x: number; y: number }>();
+    let orbitDrag: { sx: number; sy: number; theta: number; phi: number } | null = null;
+    let pinch: { dist: number; zoom: number } | null = null;
+
     const rel = (e: PointerEvent) => {
       const r = canvas.getBoundingClientRect();
       return [e.clientX - r.left, e.clientY - r.top] as const;
     };
+    const pinchDist = () => {
+      const [a, b] = [...pointers.values()];
+      return Math.hypot(a.x - b.x, a.y - b.y) || 1;
+    };
     const down = (e: PointerEvent) => {
-      const p = propsRef.current;
-      if (p.disabled || p.flight) return;
-      canvas.setPointerCapture(e.pointerId);
       const [x, y] = rel(e);
-      aimRef.current = { sx: x, sy: y, cx: x, cy: y };
+      pointers.set(e.pointerId, { x, y });
+      canvas.setPointerCapture(e.pointerId);
+      const p = propsRef.current;
+      if (p.view3d) {
+        if (pointers.size === 1) {
+          const cam = camRef.current;
+          orbitDrag = { sx: x, sy: y, theta: cam.tTheta, phi: cam.tPhi };
+        } else if (pointers.size === 2) {
+          orbitDrag = null; // a second finger switches from orbit-drag to pinch-zoom
+          pinch = { dist: pinchDist(), zoom: camRef.current.tZoom };
+        }
+      } else if (pointers.size === 1) {
+        if (p.disabled || p.flight) return;
+        aimRef.current = { sx: x, sy: y, cx: x, cy: y };
+      }
     };
     const move = (e: PointerEvent) => {
-      if (!aimRef.current) return;
+      if (!pointers.has(e.pointerId)) return;
       const [x, y] = rel(e);
-      aimRef.current.cx = x;
-      aimRef.current.cy = y;
+      pointers.set(e.pointerId, { x, y });
+      if (pointers.size === 2 && pinch) {
+        camRef.current.tZoom = clampZoom(pinch.zoom * (pinchDist() / pinch.dist));
+      } else if (orbitDrag) {
+        const cam = camRef.current;
+        cam.tTheta = orbitDrag.theta + (x - orbitDrag.sx) * 0.012;
+        cam.tPhi = clampPhi(orbitDrag.phi - (y - orbitDrag.sy) * 0.008);
+      } else if (aimRef.current) {
+        aimRef.current.cx = x;
+        aimRef.current.cy = y;
+      }
     };
-    const up = () => {
-      const a = aimRef.current;
-      aimRef.current = null;
-      if (!a) return;
-      const step = computeStep(a, propsRef.current, sizeRef.current.css);
-      if (step) propsRef.current.onShoot(step.world);
+    const release = (e: PointerEvent) => {
+      pointers.delete(e.pointerId);
+      if (pointers.size < 2) pinch = null;
+      if (pointers.size === 0) {
+        orbitDrag = null;
+        const a = aimRef.current;
+        aimRef.current = null;
+        if (a) {
+          const step = computeStep(a, propsRef.current, sizeRef.current.css);
+          if (step) propsRef.current.onShoot(step.world);
+        }
+      }
+    };
+    const wheel = (e: WheelEvent) => {
+      if (!propsRef.current.view3d) return;
+      e.preventDefault();
+      camRef.current.tZoom = clampZoom(camRef.current.tZoom * Math.exp(-e.deltaY * 0.0015));
     };
     canvas.addEventListener('pointerdown', down);
     canvas.addEventListener('pointermove', move);
-    canvas.addEventListener('pointerup', up);
-    canvas.addEventListener('pointercancel', () => (aimRef.current = null));
+    canvas.addEventListener('pointerup', release);
+    canvas.addEventListener('pointercancel', release);
+    canvas.addEventListener('wheel', wheel, { passive: false });
     return () => {
       canvas.removeEventListener('pointerdown', down);
       canvas.removeEventListener('pointermove', move);
-      canvas.removeEventListener('pointerup', up);
+      canvas.removeEventListener('pointerup', release);
+      canvas.removeEventListener('pointercancel', release);
+      canvas.removeEventListener('wheel', wheel);
     };
   }, []);
+
+  const rotateCam = (d: number) => { camRef.current.tTheta += d; };
+  const zoomCam = (f: number) => { camRef.current.tZoom = clampZoom(camRef.current.tZoom * f); };
+  const resetCam = () => {
+    const cam = camRef.current;
+    cam.tTheta = CAM_THETA0; cam.tPhi = CAM_PHI0; cam.tZoom = CAM_ZOOM0;
+  };
 
   // ----- render loop
   useEffect(() => {
@@ -129,21 +222,42 @@ export function GameCanvas(props: Props) {
       const px = (x: number) => ((x + 1) / 2) * S;
       const py = (y: number) => ((y + 1) / 2) * S;
 
-      // heat
+      // smoothly ease the camera toward whatever the last drag/pinch/button/wheel set as target
+      const cam = camRef.current;
+      cam.theta += (cam.tTheta - cam.theta) * CAM_LERP;
+      cam.phi += (cam.tPhi - cam.phi) * CAM_LERP;
+      cam.zoom += (cam.tZoom - cam.zoom) * CAM_LERP;
+      const iso: IsoView | null = p.view3d ? makeIsoView(S, cam.theta, cam.phi, cam.zoom) : null;
+      const span = p.ls.hi - p.ls.lo;
+      const elevOf = (loss: number) => clamp01((loss - p.ls.lo) / span);
+      // world position + normalised elevation -> screen pixel, in whichever mode is active
+      const proj = (x: number, y: number, elev: number): [number, number] =>
+        iso ? isoProject(iso, x, y, elev) : [px(x), py(y)];
+
+      // heat / terrain — always clear first: unexplored 3D terrain isn't drawn at all (rather
+      // than as a flat plane), so leftover pixels from a previous frame would otherwise show
+      ctx.clearRect(0, 0, S, S);
       ctx.imageSmoothingEnabled = true;
       ctx.imageSmoothingQuality = 'high';
-      if (heatRef.current) ctx.drawImage(heatRef.current, 0, 0, S, S);
-      else { ctx.fillStyle = '#0d1420'; ctx.fillRect(0, 0, S, S); }
-
-      // grid
-      ctx.strokeStyle = 'rgba(255,255,255,0.05)';
-      ctx.lineWidth = 1;
-      ctx.beginPath();
-      for (let i = 1; i < 8; i++) {
-        ctx.moveTo((S * i) / 8, 0); ctx.lineTo((S * i) / 8, S);
-        ctx.moveTo(0, (S * i) / 8); ctx.lineTo(S, (S * i) / 8);
+      if (iso) {
+        if (meshRef.current) drawTerrainMesh(ctx, meshRef.current, iso);
+      } else if (heatRef.current) {
+        ctx.drawImage(heatRef.current, 0, 0, S, S);
+      } else {
+        ctx.fillStyle = '#0d1420'; ctx.fillRect(0, 0, S, S);
       }
-      ctx.stroke();
+
+      // flat reference grid — only meaningful in the top-down 2D view
+      if (!iso) {
+        ctx.strokeStyle = 'rgba(255,255,255,0.05)';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        for (let i = 1; i < 8; i++) {
+          ctx.moveTo((S * i) / 8, 0); ctx.lineTo((S * i) / 8, S);
+          ctx.moveTo(0, (S * i) / 8); ctx.lineTo(S, (S * i) / 8);
+        }
+        ctx.stroke();
+      }
 
       // ball position (animated)
       let ball: Vec3 = p.path[p.path.length - 1];
@@ -159,8 +273,8 @@ export function GameCanvas(props: Props) {
           p.onLand();
         }
       }
-      const bx = px(ball[0]);
-      const by = py(ball[1]);
+      const ballElev = elevOf(p.ls.loss(ball[0], ball[1], ball[2]));
+      const [bx, by] = proj(ball[0], ball[1], ballElev);
       // true when the slice being painted (from the w-slider) isn't the ball's own slice
       const previewing = p.ls.fourD && !p.revealAll && Math.abs(p.z - ball[2]) > 0.02;
 
@@ -170,7 +284,10 @@ export function GameCanvas(props: Props) {
       ctx.strokeStyle = 'rgba(255,255,255,0.55)';
       ctx.lineWidth = 2;
       ctx.beginPath();
-      p.path.forEach((v, i) => (i ? ctx.lineTo(px(v[0]), py(v[1])) : ctx.moveTo(px(v[0]), py(v[1]))));
+      p.path.forEach((v, i) => {
+        const [x, y] = proj(v[0], v[1], elevOf(p.losses[i]));
+        i ? ctx.lineTo(x, y) : ctx.moveTo(x, y);
+      });
       if (flying && p.flight) ctx.lineTo(bx, by);
       ctx.stroke();
       ctx.setLineDash([]);
@@ -178,8 +295,7 @@ export function GameCanvas(props: Props) {
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       p.path.forEach((v, i) => {
-        const x = px(v[0]);
-        const y = py(v[1]);
+        const [x, y] = proj(v[0], v[1], elevOf(p.losses[i]));
         ctx.beginPath();
         ctx.arc(x, y, 9, 0, Math.PI * 2);
         ctx.fillStyle = lossColor(p.ls, p.losses[i], p.theme);
@@ -193,8 +309,7 @@ export function GameCanvas(props: Props) {
 
       // goal flag once the round is over
       if (p.revealAll) {
-        const gx = px(p.ls.best[0]);
-        const gy = py(p.ls.best[1]);
+        const [gx, gy] = proj(p.ls.best[0], p.ls.best[1], 0); // the goal is the global minimum: elevation 0
         const sameSlice = !p.ls.fourD || Math.abs(p.z - p.ls.best[2]) < 0.25;
         ctx.globalAlpha = sameSlice ? 1 : 0.55;
         ctx.strokeStyle = '#fff';
@@ -212,12 +327,22 @@ export function GameCanvas(props: Props) {
       }
 
       if (!p.revealAll) {
-        // vision ring
+        // vision ring — a world-space circle around the ball, sampled and projected
         ctx.setLineDash([3, 6]);
         ctx.strokeStyle = 'rgba(255,255,255,0.25)';
         ctx.lineWidth = 1;
         ctx.beginPath();
-        ctx.arc(bx, by, (p.diff.vision / 2) * S, 0, Math.PI * 2);
+        if (iso) {
+          const rWorld = p.diff.vision / 2;
+          const STEPS = 40;
+          for (let k = 0; k <= STEPS; k++) {
+            const ang = (k / STEPS) * Math.PI * 2;
+            const [qx, qy] = proj(ball[0] + Math.cos(ang) * rWorld, ball[1] + Math.sin(ang) * rWorld, ballElev);
+            k ? ctx.lineTo(qx, qy) : ctx.moveTo(qx, qy);
+          }
+        } else {
+          ctx.arc(bx, by, (p.diff.vision / 2) * S, 0, Math.PI * 2);
+        }
         ctx.stroke();
         ctx.setLineDash([]);
       }
@@ -225,8 +350,14 @@ export function GameCanvas(props: Props) {
       // gradient hint + aiming
       if (!p.disabled && !p.flight) {
         const pulse = 0.75 + 0.25 * Math.sin(now / 260);
-        const hx = p.hintDir[0];
-        const hy = p.hintDir[1];
+        let hx = p.hintDir[0];
+        let hy = p.hintDir[1];
+        if (iso) {
+          const [dxp, dyp] = isoProjectDir(iso, hx, hy);
+          const m = Math.hypot(dxp, dyp) || 1;
+          hx = dxp / m;
+          hy = dyp / m;
+        }
         const L = 44;
         ctx.strokeStyle = `rgba(255,214,102,${pulse})`;
         ctx.fillStyle = `rgba(255,214,102,${pulse})`;
@@ -248,8 +379,10 @@ export function GameCanvas(props: Props) {
         if (a) {
           const st = computeStep(a, p, S);
           if (st) {
-            const tx = bx + (st.world[0] / 2) * S;
-            const ty = by + (st.world[1] / 2) * S;
+            const wtx = ball[0] + st.world[0];
+            const wty = ball[1] + st.world[1];
+            const tgtElev = elevOf(p.ls.loss(wtx, wty, ball[2]));
+            const [tx, ty] = proj(wtx, wty, tgtElev);
             ctx.strokeStyle = '#fff';
             ctx.lineWidth = 3;
             ctx.setLineDash([2, 8]);
@@ -305,12 +438,39 @@ export function GameCanvas(props: Props) {
   }, []);
 
   return (
-    <div className="canvas-wrap" ref={wrapRef}>
+    <div className={`canvas-wrap${props.view3d ? ' pan-mode' : ''}`} ref={wrapRef}>
       <canvas ref={canvasRef} className="game-canvas" />
+
+      <div className="view-controls" role="group">
+        <button
+          className={props.view3d ? 'pan-active' : ''}
+          onClick={() => props.onView3DChange(!props.view3d)}
+          aria-label={props.t.toggle3DAria}
+          aria-pressed={props.view3d}
+        >
+          {props.view3d ? '🗻' : '🗺️'}
+        </button>
+      </div>
+
+      {props.view3d && (
+        <div className="mode-badge">🧭 {props.t.panModeBadge}</div>
+      )}
+
+      {props.view3d && (
+        <div className="cam-controls" role="group" aria-label={props.t.camControlsAria}>
+          <button onClick={() => rotateCam(-ROT_STEP)} aria-label={props.t.rotateLeftAria}>◂</button>
+          <button onClick={() => rotateCam(ROT_STEP)} aria-label={props.t.rotateRightAria}>▸</button>
+          <button onClick={() => zoomCam(1 / ZOOM_STEP)} aria-label={props.t.zoomOutAria}>−</button>
+          <button onClick={() => zoomCam(ZOOM_STEP)} aria-label={props.t.zoomInAria}>+</button>
+          <button onClick={resetCam} aria-label={props.t.resetViewAria}>⟲</button>
+        </div>
+      )}
     </div>
   );
 }
 
+// aiming only ever happens in the flat 2D view (see the pointer effect above), so the step is
+// always a plain screen-space direction — no camera/projection involved
 function computeStep(
   a: { sx: number; sy: number; cx: number; cy: number },
   p: Props,

@@ -132,8 +132,51 @@ h1 { font-size: 22px; margin: 8px 0 4px; letter-spacing: -0.02em; }
 .canvas-wrap {
   flex: 1; min-width: 0; aspect-ratio: 1 / 1; border-radius: var(--radius); overflow: hidden;
   border: 1px solid var(--border); background: #0d1420; touch-action: none; position: relative;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+/* pan mode changes what dragging does, so the whole map gets an unmissable amber tint */
+.canvas-wrap.pan-mode {
+  border-color: #ffd666; box-shadow: 0 0 0 2px rgba(255,214,102,0.3) inset;
 }
 .game-canvas { width: 100%; height: 100%; display: block; touch-action: none; }
+.canvas-wrap.pan-mode .game-canvas { cursor: grab; }
+.canvas-wrap.pan-mode .game-canvas:active { cursor: grabbing; }
+
+.view-controls {
+  position: absolute; right: 8px; top: 8px; z-index: 2;
+  display: flex; gap: 4px;
+}
+.view-controls button {
+  width: 32px; height: 32px; border-radius: 50%; border: 1px solid var(--border);
+  background: rgba(16,24,40,0.75); backdrop-filter: blur(4px);
+  color: var(--text); font-size: 15px; line-height: 1; cursor: pointer; display: flex;
+  align-items: center; justify-content: center;
+}
+.view-controls button[aria-pressed="true"] { border-color: var(--accent-2); }
+.view-controls button.pan-active {
+  border-color: #ffd666; background: rgba(255,214,102,0.22);
+  box-shadow: 0 0 0 2px rgba(255,214,102,0.35);
+}
+
+.mode-badge {
+  position: absolute; left: 8px; top: 8px; z-index: 2;
+  display: flex; align-items: center; gap: 5px;
+  background: rgba(255,214,102,0.18); border: 1px solid rgba(255,214,102,0.65);
+  color: #ffd666; font-weight: 700; font-size: 11px; letter-spacing: 0.02em;
+  border-radius: 999px; padding: 5px 10px 5px 8px;
+}
+
+.cam-controls {
+  position: absolute; right: 10px; bottom: 10px; z-index: 2;
+  display: flex; gap: 4px; background: rgba(16,24,40,0.75); backdrop-filter: blur(4px);
+  border: 1px solid var(--border); border-radius: 999px; padding: 4px;
+}
+.cam-controls button {
+  width: 28px; height: 28px; border-radius: 50%; border: none; background: transparent;
+  color: var(--text); font-size: 15px; line-height: 1; cursor: pointer; display: flex;
+  align-items: center; justify-content: center;
+}
+.cam-controls button:hover { background: rgba(255,255,255,0.1); }
 
 .color-bar { flex: none; width: 40px; display: flex; flex-direction: column; align-items: center; gap: 4px; }
 .color-bar-end { display: flex; flex-direction: column; align-items: center; gap: 1px; }

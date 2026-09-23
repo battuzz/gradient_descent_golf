@@ -1,4 +1,5 @@
 import type { Landscape, Vec3 } from './landscape';
+import { isoDepth, isoProject, type IsoView } from './iso';
 
 /** Resolution of the offscreen heat-map (it is up-scaled smoothly on the visible canvas). */
 export const RES = 140;
@@ -170,4 +171,151 @@ export function paintHeat(
       d[o + 3] = 255;
     }
   }
+}
+
+/** Mesh resolution of the 3D relief view (quads per side). */
+export const TERRAIN_GRID = 32;
+
+const clamp01 = (v: number) => (v < 0 ? 0 : v > 1 ? 1 : v);
+const clamp255 = (v: number) => (v < 0 ? 0 : v > 255 ? 255 : v | 0);
+const smooth = (a: number) => a * a * (3 - 2 * a);
+
+// fixed upper-left key light, in (x, y, elevation) space
+const LIGHT: [number, number, number] = [-0.55, -0.35, 0.75];
+const LIGHT_MAG = Math.hypot(LIGHT[0], LIGHT[1], LIGHT[2]);
+const SLOPE_K = 2.6; // exaggerates elevation differences into visible relief
+/** quads whose 4 corners average below this visibility are skipped entirely, not drawn faint */
+const VIS_CUTOFF = 0.03;
+
+export interface TerrainMesh {
+  grid: number;
+  /** per-vertex elevation, visibility and colour — cheap to reproject every frame, expensive
+   *  to resample (loss/palette calls), so this is rebuilt only when the game state changes */
+  elev: Float32Array;
+  vis: Float32Array;
+  col: Float32Array;
+}
+
+/**
+ * Samples the loss landscape into a heightfield mesh (loss -> elevation) with the same
+ * fog-of-war visibility as `paintHeat`. Unlike the flat heat-map, unrevealed vertices keep
+ * their real elevation and colour — `drawTerrainMesh` uses `vis` to skip drawing them
+ * entirely, rather than flattening them into a visible "fog plane".
+ */
+export function buildTerrainMesh(
+  ls: Landscape,
+  z: number,
+  reveals: Vec3[],
+  ballXY: [number, number],
+  vision: number,
+  revealAll: boolean,
+  theme: PaletteId,
+): TerrainMesh {
+  const stops = PALETTES[theme].stops;
+  const span = ls.hi - ls.lo;
+  const inner = vision * 0.55;
+  const N = TERRAIN_GRID;
+
+  const visAlpha = (x: number, y: number): number => {
+    if (revealAll) return 1;
+    let a = 0;
+    const bdd = Math.hypot(x - ballXY[0], y - ballXY[1]);
+    if (bdd < vision) a = bdd <= inner ? 1 : 1 - (bdd - inner) / (vision - inner);
+    for (const p of reveals) {
+      const dd = Math.hypot(x - p[0], y - p[1]);
+      if (dd >= vision) continue;
+      let w = dd <= inner ? 1 : 1 - (dd - inner) / (vision - inner);
+      if (ls.fourD) {
+        const dz = (z - p[2]) / W_SIGMA;
+        w *= Math.exp(-dz * dz);
+      }
+      if (w > a) a = w;
+    }
+    return a;
+  };
+
+  const verts = N + 1;
+  const elev = new Float32Array(verts * verts);
+  const vis = new Float32Array(verts * verts);
+  const col = new Float32Array(verts * verts * 3);
+  const vidx = (i: number, j: number) => j * verts + i;
+  for (let j = 0; j < verts; j++) {
+    const y = -1 + (2 * j) / N;
+    for (let i = 0; i < verts; i++) {
+      const x = -1 + (2 * i) / N;
+      const t = clamp01((ls.loss(x, y, z) - ls.lo) / span);
+      const [r, g, b] = palette(stops, t);
+      const k = vidx(i, j);
+      elev[k] = t;
+      vis[k] = smooth(clamp01(visAlpha(x, y)));
+      col[k * 3] = r; col[k * 3 + 1] = g; col[k * 3 + 2] = b;
+    }
+  }
+  return { grid: N, elev, vis, col };
+}
+
+/**
+ * Reprojects and draws a mesh built by `buildTerrainMesh` through the given camera — cheap
+ * (no loss/palette sampling), so it's safe to call every animation frame while the camera
+ * orbits. Quads that are entirely unexplored are skipped, not drawn as a flat "fog plane".
+ */
+export function drawTerrainMesh(ctx: CanvasRenderingContext2D, mesh: TerrainMesh, view: IsoView): void {
+  const N = mesh.grid;
+  const verts = N + 1;
+  const { elev, vis, col } = mesh;
+  const vidx = (i: number, j: number) => j * verts + i;
+
+  const cells: [number, number, number][] = [];
+  for (let j = 0; j < N; j++) {
+    for (let i = 0; i < N; i++) {
+      const k00 = vidx(i, j), k10 = vidx(i + 1, j), k01 = vidx(i, j + 1), k11 = vidx(i + 1, j + 1);
+      const v = (vis[k00] + vis[k10] + vis[k01] + vis[k11]) / 4;
+      if (v <= VIS_CUTOFF) continue; // unexplored: not drawn at all, rather than a flat plane
+      const cx = -1 + (2 * i + 1) / N, cy = -1 + (2 * j + 1) / N;
+      const ce = (elev[k00] + elev[k10] + elev[k01] + elev[k11]) / 4;
+      cells.push([i, j, isoDepth(view, cx, cy, ce)]);
+    }
+  }
+  // painter's algorithm: paint back-to-front so nearer quads correctly overdraw farther ones
+  cells.sort((a, b) => b[2] - a[2]);
+
+  for (const [i, j] of cells) {
+    const x0 = -1 + (2 * i) / N, x1 = -1 + (2 * (i + 1)) / N;
+    const y0 = -1 + (2 * j) / N, y1 = -1 + (2 * (j + 1)) / N;
+    const k00 = vidx(i, j), k10 = vidx(i + 1, j), k01 = vidx(i, j + 1), k11 = vidx(i + 1, j + 1);
+    const e00 = elev[k00], e10 = elev[k10], e01 = elev[k01], e11 = elev[k11];
+
+    const dEdx = ((e10 + e11 - e00 - e01) / 2) * SLOPE_K;
+    const dEdy = ((e01 + e11 - e00 - e10) / 2) * SLOPE_K;
+    const nx = -dEdx, ny = -dEdy, nz = 1;
+    const nMag = Math.hypot(nx, ny, nz);
+    const bright = Math.min(1.35, Math.max(0.4, (nx * LIGHT[0] + ny * LIGHT[1] + nz * LIGHT[2]) / (nMag * LIGHT_MAG)));
+
+    const cr = (col[k00 * 3] + col[k10 * 3] + col[k01 * 3] + col[k11 * 3]) / 4;
+    const cg = (col[k00 * 3 + 1] + col[k10 * 3 + 1] + col[k01 * 3 + 1] + col[k11 * 3 + 1]) / 4;
+    const cb = (col[k00 * 3 + 2] + col[k10 * 3 + 2] + col[k01 * 3 + 2] + col[k11 * 3 + 2]) / 4;
+    const alpha = (vis[k00] + vis[k10] + vis[k01] + vis[k11]) / 4;
+
+    const [p00x, p00y] = isoProject(view, x0, y0, e00);
+    const [p10x, p10y] = isoProject(view, x1, y0, e10);
+    const [p11x, p11y] = isoProject(view, x1, y1, e11);
+    const [p01x, p01y] = isoProject(view, x0, y1, e01);
+
+    const fill = `rgb(${clamp255(cr * bright)},${clamp255(cg * bright)},${clamp255(cb * bright)})`;
+    ctx.globalAlpha = alpha;
+    ctx.fillStyle = fill;
+    ctx.beginPath();
+    ctx.moveTo(p00x, p00y);
+    ctx.lineTo(p10x, p10y);
+    ctx.lineTo(p11x, p11y);
+    ctx.lineTo(p01x, p01y);
+    ctx.closePath();
+    ctx.fill();
+    // stroking each quad in its own fill colour papers over the hairline anti-aliasing seams
+    // canvas otherwise leaves between adjacent polygon fills
+    ctx.strokeStyle = fill;
+    ctx.lineWidth = 1;
+    ctx.stroke();
+  }
+  ctx.globalAlpha = 1;
 }
