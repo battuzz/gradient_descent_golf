@@ -261,7 +261,6 @@ function Round({ event, name, diff, theme, onThemeChange, view3d, onView3DChange
   const [flight, setFlight] = useState<Flight | null>(null);
   const [wTarget, setWTarget] = useState(ls.start[2]);
   const [autoAim, setAutoAim] = useState(diff.autoAim);
-  const [camMode, setCamMode] = useState<'aim' | 'pan'>('aim');
   const [earlyStop, setEarlyStop] = useState(false);
   const [confirmStop, setConfirmStop] = useState(false);
   const confirmTimer = useRef<number | undefined>(undefined);
@@ -437,8 +436,6 @@ function Round({ event, name, diff, theme, onThemeChange, view3d, onView3DChange
           revealAll={done}
           view3d={view3d}
           onView3DChange={onView3DChange}
-          camMode={camMode}
-          onCamModeChange={setCamMode}
           onShoot={onShoot}
           onLand={onLand}
         />
@@ -475,16 +472,20 @@ function Round({ event, name, diff, theme, onThemeChange, view3d, onView3DChange
               </div>
             </div>
           )}
-          <div className="row">
-            <button className={`toggle ${autoAim ? 'on' : ''}`} onClick={() => setAutoAim((a) => !a)}>
-              <span className="knob" /> {t.autoAimToggle}
-            </button>
-            <span className="muted small">
-              {view3d && camMode === 'pan'
-                ? t.dragToPanHint
-                : shotsTaken === 0 ? t.dragToShootHint : t.shotsLeftText(diff.shots - shotsTaken)}
-            </span>
-          </div>
+          {view3d ? (
+            <div className="row center">
+              <span className="muted small">{t.dragToPanHint}</span>
+            </div>
+          ) : (
+            <div className="row">
+              <button className={`toggle ${autoAim ? 'on' : ''}`} onClick={() => setAutoAim((a) => !a)}>
+                <span className="knob" /> {t.autoAimToggle}
+              </button>
+              <span className="muted small">
+                {shotsTaken === 0 ? t.dragToShootHint : t.shotsLeftText(diff.shots - shotsTaken)}
+              </span>
+            </div>
+          )}
           {shotsTaken > 0 && (
             <button className={`stop-btn ${confirmStop ? 'confirm' : ''}`} onClick={requestStop}>
               {confirmStop ? t.tapAgainBtn : t.finishRoundBtn}

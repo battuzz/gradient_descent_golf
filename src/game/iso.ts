@@ -11,10 +11,7 @@
  *   up    = (-cosT sinP, -sinT sinP, cosP)
  *
  * (`up` is what makes height read as height: at phi = 0, up = (0, 0, 1), so elevation maps
- * straight onto the screen's vertical axis, the way a side-on view should look.) The ground
- * plane's part of this (h = 0) is an orthonormal rotation, so its inverse is its own transpose —
- * that's what lets a screen-space drag be turned back into a world-space aim direction in 3D
- * mode (see isoUnprojectDelta).
+ * straight onto the screen's vertical axis, the way a side-on view should look.)
  */
 export interface IsoView {
   cosT: number; sinT: number; cosP: number; sinP: number;
@@ -63,11 +60,4 @@ export function isoProjectDir(v: IsoView, dx: number, dy: number): [number, numb
   const right = dx * v.sinT - dy * v.cosT;
   const up = -v.sinP * (dx * v.cosT + dy * v.sinT);
   return [right * v.scale, -up * v.scale];
-}
-
-/** Inverts the ground-plane (h = 0) projection to turn a screen drag into a world (x, y) delta. */
-export function isoUnprojectDelta(v: IsoView, dpx: number, dpy: number): [number, number] {
-  const a = dpx / v.scale;
-  const b = dpy / (v.scale * v.sinP);
-  return [v.sinT * a + v.cosT * b, -v.cosT * a + v.sinT * b];
 }

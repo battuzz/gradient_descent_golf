@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react';
 import type { Difficulty, Landscape, Vec3 } from '../game/landscape';
 import { buildTerrainMesh, drawTerrainMesh, lossColor, paintHeat, RES, type PaletteId, type TerrainMesh } from '../game/render';
-import { isoProject, isoProjectDir, isoUnprojectDelta, makeIsoView, type IsoView } from '../game/iso';
+import { isoProject, isoProjectDir, makeIsoView, type IsoView } from '../game/iso';
 import type { Dict } from '../lib/i18n';
 
 const clamp01 = (v: number) => (v < 0 ? 0 : v > 1 ? 1 : v);
@@ -48,11 +48,9 @@ interface Props {
   autoAim: boolean;
   disabled: boolean;
   revealAll: boolean;
+  /** 2D top-down heat-map (drag aims and shoots) vs 3D relief (drag orbits the camera instead) */
   view3d: boolean;
   onView3DChange: (v: boolean) => void;
-  /** 'aim' drags shoot (default); 'pan' drags orbit the camera instead — only meaningful in 3D */
-  camMode: 'aim' | 'pan';
-  onCamModeChange: (m: 'aim' | 'pan') => void;
   onShoot: (step: [number, number]) => void;
   onLand: () => void;
 }
@@ -119,11 +117,11 @@ export function GameCanvas(props: Props) {
     return () => ro.disconnect();
   }, []);
 
-  // ----- pointer input. Two explicit modes (switched via the button in the topbar), rather
-  // than splitting behaviour by finger count, so dragging always does one predictable thing:
-  //  - 'aim' (default): drag shoots, exactly like the 2D view. Extra fingers are ignored.
-  //  - 'pan' (3D only): drag orbits the camera (horizontal = rotate, vertical = tilt); a second
-  //    finger switches to pinch-to-zoom instead.
+  // ----- pointer input. The view itself picks the gesture, so dragging always does one
+  // predictable thing:
+  //  - 2D top-down heat-map: drag aims and shoots. Extra fingers are ignored.
+  //  - 3D relief: drag orbits the camera (horizontal = rotate, vertical = tilt); a second
+  //    finger switches to pinch-to-zoom instead. Aiming isn't possible in this view.
   useEffect(() => {
     const canvas = canvasRef.current!;
     const pointers = new Map<number, { x: number; y: number }>();
@@ -143,7 +141,7 @@ export function GameCanvas(props: Props) {
       pointers.set(e.pointerId, { x, y });
       canvas.setPointerCapture(e.pointerId);
       const p = propsRef.current;
-      if (p.view3d && p.camMode === 'pan') {
+      if (p.view3d) {
         if (pointers.size === 1) {
           const cam = camRef.current;
           orbitDrag = { sx: x, sy: y, theta: cam.tTheta, phi: cam.tPhi };
@@ -179,7 +177,7 @@ export function GameCanvas(props: Props) {
         const a = aimRef.current;
         aimRef.current = null;
         if (a) {
-          const step = computeStep(a, propsRef.current, sizeRef.current.css, camRef.current);
+          const step = computeStep(a, propsRef.current, sizeRef.current.css);
           if (step) propsRef.current.onShoot(step.world);
         }
       }
@@ -379,7 +377,7 @@ export function GameCanvas(props: Props) {
 
         const a = aimRef.current;
         if (a) {
-          const st = computeStep(a, p, S, cam);
+          const st = computeStep(a, p, S);
           if (st) {
             const wtx = ball[0] + st.world[0];
             const wty = ball[1] + st.world[1];
@@ -439,32 +437,22 @@ export function GameCanvas(props: Props) {
     return () => cancelAnimationFrame(raf);
   }, []);
 
-  const panning = props.view3d && props.camMode === 'pan';
   return (
-    <div className={`canvas-wrap${panning ? ' pan-mode' : ''}`} ref={wrapRef}>
+    <div className={`canvas-wrap${props.view3d ? ' pan-mode' : ''}`} ref={wrapRef}>
       <canvas ref={canvasRef} className="game-canvas" />
 
-      <div className="view-controls" role="group" aria-label={props.t.camControlsAria}>
+      <div className="view-controls" role="group">
         <button
+          className={props.view3d ? 'pan-active' : ''}
           onClick={() => props.onView3DChange(!props.view3d)}
           aria-label={props.t.toggle3DAria}
           aria-pressed={props.view3d}
         >
           {props.view3d ? '🗻' : '🗺️'}
         </button>
-        {props.view3d && (
-          <button
-            className={panning ? 'pan-active' : ''}
-            onClick={() => props.onCamModeChange(panning ? 'aim' : 'pan')}
-            aria-label={props.t.toggleCamModeAria}
-            aria-pressed={panning}
-          >
-            {panning ? '🧭' : '🎯'}
-          </button>
-        )}
       </div>
 
-      {panning && (
+      {props.view3d && (
         <div className="mode-badge">🧭 {props.t.panModeBadge}</div>
       )}
 
@@ -481,26 +469,18 @@ export function GameCanvas(props: Props) {
   );
 }
 
+// aiming only ever happens in the flat 2D view (see the pointer effect above), so the step is
+// always a plain screen-space direction — no camera/projection involved
 function computeStep(
   a: { sx: number; sy: number; cx: number; cy: number },
   p: Props,
   size: number,
-  cam: CamState,
 ): { world: [number, number]; lr: number } | null {
   const vx = a.cx - a.sx;
   const vy = a.cy - a.sy;
   const len = Math.hypot(vx, vy);
   if (len < DEAD_ZONE) return null;
   const lr = Math.min(1, len / (0.4 * size));
-  let dir: [number, number];
-  if (p.autoAim) {
-    dir = p.hintDir;
-  } else if (p.view3d) {
-    const [wx, wy] = isoUnprojectDelta(makeIsoView(size, cam.theta, cam.phi, cam.zoom), vx, vy);
-    const m = Math.hypot(wx, wy) || 1;
-    dir = [wx / m, wy / m];
-  } else {
-    dir = [vx / len, vy / len];
-  }
+  const dir: [number, number] = p.autoAim ? p.hintDir : [vx / len, vy / len];
   return { world: [dir[0] * lr * MAX_STEP, dir[1] * lr * MAX_STEP], lr };
 }
