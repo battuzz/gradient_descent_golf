@@ -58,7 +58,7 @@ export const PALETTES: Record<PaletteId, PaletteDef> = {
 
 export const PALETTE_IDS: PaletteId[] = ['sunset', 'viridis', 'cividis', 'iceFire'];
 
-function palette(stops: [number, [number, number, number]][], t: number): [number, number, number] {
+export function palette(stops: [number, [number, number, number]][], t: number): [number, number, number] {
   t = t < 0 ? 0 : t > 1 ? 1 : t;
   for (let i = 1; i < stops.length; i++) {
     if (t <= stops[i][0]) {

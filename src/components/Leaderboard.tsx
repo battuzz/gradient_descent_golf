@@ -4,6 +4,7 @@ import { fetchScores, rank, usingFirebase, type ScoreEntry } from '../lib/scores
 import { getDifficulty } from '../game/landscape';
 import { DEFAULT_EVENT, navigate, playUrl, setStoredEvent } from '../lib/route';
 import { useLang } from '../lib/i18n';
+import { DescentBanner } from './DescentBanner';
 
 const POLL_MS = 4000;
 const MEDALS = ['🥇', '🥈', '🥉'];
@@ -63,6 +64,8 @@ export function Leaderboard({ event }: { event: string }) {
         <h1>Gradient Descent Golf</h1>
         <p className="lead">{t.tagline}</p>
       </header>
+
+      <DescentBanner />
 
       <div className="board-grid">
         <div className="qr-card">
