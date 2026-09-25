@@ -16,7 +16,9 @@ export interface Difficulty {
   gradNoise: number;
   /** Std-dev of the noise added to where the ball actually lands (world units). */
   landNoise: number;
-  /** Radius of the region revealed around every visited point. */
+  /** Fog of war: only the area around visited points is shown. Off = the whole slice is visible. */
+  fog: boolean;
+  /** Radius of the region revealed around every visited point (only matters with `fog`). */
   vision: number;
   /** Fraction of pixels inside the revealed radius that are actually painted (1 = a solid patch,
    *  lower = a sparse, speckled reveal that shows only scattered samples of the true terrain). */
@@ -29,17 +31,17 @@ export const DIFFICULTIES: Difficulty[] = [
   {
     id: 'easy', label: 'Batch GD',
     shots: 8, fourD: false, decoys: 0, ripple: 0.03, gradNoise: 0, landNoise: 0,
-    vision: 0.6, pixelSample: 1, multiplier: 1, autoAim: true,
+    fog: true, vision: 0.6, pixelSample: 1, multiplier: 1, autoAim: true,
   },
   {
     id: 'medium', label: 'SGD',
     shots: 7, fourD: false, decoys: 5, ripple: 0.11, gradNoise: 0.3, landNoise: 0.03,
-    vision: 0.21, pixelSample: 0.5, multiplier: 1.25, autoAim: false,
+    fog: true, vision: 0.21, pixelSample: 0.5, multiplier: 1.25, autoAim: false,
   },
   {
     id: 'hard', label: 'Hyper-SGD 4D',
     shots: 7, fourD: true, decoys: 7, ripple: 0.16, gradNoise: 0.45, landNoise: 0.05,
-    vision: 0.26, pixelSample: 0.3, multiplier: 1.5, autoAim: false,
+    fog: false, vision: 0.26, pixelSample: 0.3, multiplier: 1.5, autoAim: false,
   },
 ];
 
