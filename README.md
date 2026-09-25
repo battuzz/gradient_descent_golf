@@ -23,7 +23,8 @@ can be hosted for free on GitHub Pages, with scores published live to Firestore.
   (you just choose the learning rate); on the noisier levels you aim manually.
   Hyper-SGD 4D adds a slider for the hidden 4th parameter `w`.
 - Fog of war only reveals terrain you've actually visited — you're optimizing
-  nearly blind, like a real optimizer only sees local gradients.
+  nearly blind, like a real optimizer only sees local gradients. Hyper-SGD 4D has
+  no fog: the whole slice is visible, but only for one value of `w` at a time.
 - When shots run out, the full landscape is revealed, points are computed from how
   much of the gap between your starting loss and the true global minimum you closed,
   and the score is published to the leaderboard under your name.
