@@ -10,9 +10,9 @@ service cloud.firestore {
                     && request.resource.data.name.size() <= 20
                     && request.resource.data.points is number
                     && request.resource.data.points >= 0
-                    && request.resource.data.points <= 1500
+                    && request.resource.data.points <= 2000
                     && request.resource.data.loss is number
-                    && request.resource.data.difficulty in ['easy', 'medium', 'hard']
+                    && request.resource.data.difficulty in ['easy', 'medium', 'hard', 'extreme']
                     && request.resource.data.event is string
                     && request.resource.data.event.size() <= 40
                     && request.resource.data.shots is number
