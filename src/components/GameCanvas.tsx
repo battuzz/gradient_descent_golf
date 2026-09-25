@@ -275,8 +275,9 @@ export function GameCanvas(props: Props) {
       }
       const ballElev = elevOf(p.ls.loss(ball[0], ball[1], ball[2]));
       const [bx, by] = proj(ball[0], ball[1], ballElev);
-      // true when the slice being painted (from the w-slider) isn't the ball's own slice
-      const previewing = p.ls.fourD && !p.revealAll && Math.abs(p.z - ball[2]) > 0.02;
+      // true when the slice being painted (from the w-slider) isn't the ball's own slice — while
+      // aiming, or while exploring other slices of the fully revealed map after the round
+      const previewing = p.ls.fourD && Math.abs(p.z - ball[2]) > 0.02;
 
       // trail
       ctx.lineJoin = 'round';
@@ -418,7 +419,7 @@ export function GameCanvas(props: Props) {
 
       // preview badge: makes it unmistakable that the terrain shown is a different w-slice
       if (previewing) {
-        const label = p.t.previewingLabel(p.z.toFixed(2));
+        const label = p.revealAll ? p.t.sliceLabel(p.z.toFixed(2)) : p.t.previewingLabel(p.z.toFixed(2));
         ctx.font = '700 12px system-ui, sans-serif';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';

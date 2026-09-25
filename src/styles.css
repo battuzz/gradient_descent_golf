@@ -203,6 +203,12 @@ h1 { font-size: 22px; margin: 8px 0 4px; letter-spacing: -0.02em; }
 .tick { position: absolute; top: -2px; width: 2px; height: 8px; pointer-events: none; }
 .tick.now { background: #fff; }
 .tick.hint { background: #ffd666; top: 22px; }
+.tick.goal { background: #ff4d6d; top: 22px; }
+.recap-slider { width: 100%; text-align: left; }
+.recap-slider .slider-label { gap: 8px; }
+.recap-slider .slider-label > span:first-child { white-space: nowrap; }
+.recap-slider .row { flex-wrap: nowrap !important; }
+.chip.goal { border-color: #ff4d6d; }
 
 .toggle {
   display: flex; align-items: center; gap: 8px; background: var(--panel-solid);
