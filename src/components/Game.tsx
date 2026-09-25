@@ -175,22 +175,20 @@ function Setup(props: {
  * then the player takes the shot it just taught them, then the next card appears. Tip 1
  * additionally renders a live colour-scale legend for the current theme.
  */
-function tutorialTips(t: Dict, fog: boolean): { icon: string; text: string; also?: string; note?: string; legend?: boolean }[] {
-  const tips = [
+function tutorialTips(t: Dict): { icon: string; text: string; also?: string; note?: string; legend?: boolean }[] {
+  return [
     { icon: '🖱️', text: t.tipDrag },
     { icon: '🎯', legend: true, text: t.tipLegend, note: t.tipLegendNote },
     { icon: '➤', text: t.tipArrow, also: t.tipArrowAlso },
     { icon: '🌫️', text: t.tipFog },
   ];
-  // the fog card only makes sense on courses that actually have fog of war
-  return fog ? tips : tips.slice(0, -1);
 }
 
 function TutorialOverlay({
-  step, theme, fog, onNext, onSkip,
-}: { step: number; theme: PaletteId; fog: boolean; onNext: () => void; onSkip: () => void }) {
+  step, theme, onNext, onSkip,
+}: { step: number; theme: PaletteId; onNext: () => void; onSkip: () => void }) {
   const { t } = useLang();
-  const tips = tutorialTips(t, fog);
+  const tips = tutorialTips(t);
   const tip = tips[step];
   const last = step === tips.length - 1;
   return (
@@ -354,7 +352,7 @@ function Round({
 
   const shotsTaken = path.length - 1;
   const done = (shotsTaken >= diff.shots || earlyStop) && !flight;
-  const TIP_COUNT = diff.fog ? 4 : 3;
+  const TIP_COUNT = 4;
   const tipShowing = !fourDPending && !tutorialSeen && !done && dismissedCount < TIP_COUNT && shotsTaken === dismissedCount;
   const blocked = fourDPending || tipShowing;
   const nextTip = () => {
@@ -522,7 +520,7 @@ function Round({
       {fourDPending ? (
         <FourDIntro onDismiss={dismissFourD} />
       ) : (
-        tipShowing && <TutorialOverlay step={dismissedCount} theme={theme} fog={diff.fog} onNext={nextTip} onSkip={skipTutorial} />
+        tipShowing && <TutorialOverlay step={dismissedCount} theme={theme} onNext={nextTip} onSkip={skipTutorial} />
       )}
 
       {!done ? (

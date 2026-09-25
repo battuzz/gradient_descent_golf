@@ -138,7 +138,7 @@ const en: Dict = {
   diffBlurb: {
     easy: 'One smooth valley, exact gradient — just follow the arrow downhill.',
     medium: 'Bumpy terrain, noisy gradient, half the view, speckled.',
-    hard: 'A hidden 4th dimension: you see the whole map, but only one w-slice at a time.',
+    hard: 'A hidden 4th dimension and a small window of visibility.',
   },
   paletteBlurb: {
     sunset: 'Default — high-contrast, most colourful',
@@ -242,7 +242,7 @@ const it: Dict = {
   diffBlurb: {
     easy: 'Una valle liscia, gradiente esatto — segui semplicemente la freccia in discesa.',
     medium: 'Terreno accidentato, gradiente rumoroso, metà visuale, a chiazze.',
-    hard: 'Una quarta dimensione nascosta: vedi tutta la mappa, ma una sola sezione w alla volta.',
+    hard: 'Una quarta dimensione nascosta e una piccola finestra di visibilità.',
   },
   paletteBlurb: {
     sunset: 'Predefinito — alto contrasto, più colorato',
