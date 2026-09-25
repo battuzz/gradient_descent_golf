@@ -57,7 +57,10 @@ interface View { cT: number; sT: number; cP: number; sP: number; scale: number; 
 
 function makeView(W: number, H: number, theta: number, phi: number): View {
   const cP = Math.cos(phi), sP = Math.sin(phi);
-  const scale = Math.min((W * 0.96) / (2 * GH), (H * 0.94) / (2 * GH * sP + HWS * cP));
+  // wide banners are height-bound: zoom past the strict fit so the course spans more of the width
+  // (only the far corner can graze the top edge, and only briefly as the camera orbits)
+  const zoom = W / H > 2.2 ? 1.18 : 1;
+  const scale = zoom * Math.min((W * 0.96) / (2 * GH), (H * 0.94) / (2 * GH * sP + HWS * cP));
   return { cT: Math.cos(theta), sT: Math.sin(theta), cP, sP, scale, ox: W / 2, oy: H / 2 + 0.5 * HWS * cP * scale + H * 0.03 };
 }
 const proj = (v: View, x: number, y: number, h: number): [number, number] => {
@@ -300,7 +303,9 @@ export function DescentBanner() {
     const drawScene = () => {
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       ctx.clearRect(0, 0, W, H);
-      const v = makeView(W, H, theta, 0.82 + 0.08 * Math.sin(clock * 0.21));
+      // flatter camera on wide banners: less vertical extent means a bigger course on screen
+      const phiBase = W / H > 2.2 ? 0.7 : 0.82;
+      const v = makeView(W, H, theta, phiBase + 0.07 * Math.sin(clock * 0.21));
       const { ls } = course;
 
       let E = course.elev, C = course.col;
