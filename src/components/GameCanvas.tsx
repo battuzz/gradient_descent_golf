@@ -74,11 +74,9 @@ export function GameCanvas(props: Props) {
   // then reprojected every frame at whatever camera angle/zoom is current (see the render loop).
   useEffect(() => {
     const ball = props.path[props.path.length - 1];
-    // without fog the terrain is painted fully revealed all round long (like the finished recap)
-    const reveal = props.revealAll || !props.diff.fog;
     if (props.view3d) {
       meshRef.current = buildTerrainMesh(
-        props.ls, props.z, props.reveals, [ball[0], ball[1]], props.diff.vision, reveal, props.theme,
+        props.ls, props.z, props.reveals, [ball[0], ball[1]], props.diff.vision, props.revealAll, props.theme,
       );
     } else {
       let off = heatRef.current;
@@ -89,17 +87,17 @@ export function GameCanvas(props: Props) {
       }
       const octx = off.getContext('2d')!;
       const img = octx.createImageData(RES, RES);
-      // a full reveal is always clean (no stippling) so the map reads well
-      const pixelSample = reveal ? 1 : props.diff.pixelSample;
+      // the finished round always reveals cleanly (no stippling) so the recap map reads well
+      const pixelSample = props.revealAll ? 1 : props.diff.pixelSample;
       paintHeat(
         img, props.ls, props.z, props.reveals, [ball[0], ball[1]],
-        props.diff.vision, reveal, pixelSample, props.theme,
+        props.diff.vision, props.revealAll, pixelSample, props.theme,
       );
       octx.putImageData(img, 0, 0);
     }
   }, [
     props.ls, props.z, props.reveals, props.path, props.diff.vision, props.diff.pixelSample,
-    props.revealAll, props.diff.fog, props.theme, props.view3d,
+    props.revealAll, props.theme, props.view3d,
   ]);
 
   // ----- sizing
@@ -329,7 +327,7 @@ export function GameCanvas(props: Props) {
         ctx.globalAlpha = 1;
       }
 
-      if (!p.revealAll && p.diff.fog) {
+      if (!p.revealAll) {
         // vision ring — a world-space circle around the ball, sampled and projected
         ctx.setLineDash([3, 6]);
         ctx.strokeStyle = 'rgba(255,255,255,0.25)';
