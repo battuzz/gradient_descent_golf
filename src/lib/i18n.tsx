@@ -26,6 +26,19 @@ export interface Dict {
   playHereInstead: string;
   copyLink: string;
   tickerScored: (name: string, points: number, diff: string) => string;
+  /** status pill of the animated descent banner */
+  banner: {
+    teeOff: string;
+    aiming: string;
+    descending: string;
+    finalApproach: string;
+    localMin: string;
+    globalMin: (shots: number) => string;
+    newLandscape: string;
+    shot: string;
+    round: string;
+    aria: string;
+  };
 
   // ---- setup screen
   setupLead: string;
@@ -126,6 +139,18 @@ const en: Dict = {
   playHereInstead: 'Play here instead →',
   copyLink: 'Copy link',
   tickerScored: (name, points, diff) => `🏌️ ${name} scored ${points} pts on ${diff}`,
+  banner: {
+    teeOff: 'teeing off',
+    aiming: 'computing −∇L',
+    descending: 'descending',
+    finalApproach: 'final approach',
+    localMin: 'local minimum? keep going',
+    globalMin: (n) => `global minimum · ${n} shots`,
+    newLandscape: 'new landscape',
+    shot: 'shot',
+    round: 'round',
+    aria: 'A rotating 3D loss landscape where a golf ball hops downhill toward the global minimum',
+  },
 
   setupLead: 'You are the optimizer. Roll the ball downhill on a hidden loss landscape and find the deepest '
     + 'valley before you run out of steps.',
@@ -231,6 +256,18 @@ const it: Dict = {
   playHereInstead: 'Gioca qui invece →',
   copyLink: 'Copia link',
   tickerScored: (name, points, diff) => `🏌️ ${name} ha segnato ${points} pt su ${diff}`,
+  banner: {
+    teeOff: 'si parte',
+    aiming: 'calcolo −∇L',
+    descending: 'in discesa',
+    finalApproach: 'ultimo tiro',
+    localMin: 'minimo locale? avanti',
+    globalMin: (n) => `minimo globale · ${n} tiri`,
+    newLandscape: 'nuovo paesaggio',
+    shot: 'tiro',
+    round: 'round',
+    aria: 'Un paesaggio 3D della loss che ruota, con una pallina da golf che scende verso il minimo globale',
+  },
 
   setupLead: 'Vesti i panni di un ottimizzatore. Scegli come muoverti e trova il punto più basso prima di '
     + 'esaurire i tiri.',
