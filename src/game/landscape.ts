@@ -39,7 +39,7 @@ export const DIFFICULTIES: Difficulty[] = [
   {
     id: 'hard', label: 'Hyper-SGD 4D',
     shots: 7, fourD: true, decoys: 7, ripple: 0.16, gradNoise: 0.45, landNoise: 0.05,
-    vision: 0.16, pixelSample: 0.3, multiplier: 1.5, autoAim: false,
+    vision: 0.26, pixelSample: 0.3, multiplier: 1.5, autoAim: false,
   },
 ];
 
