@@ -1,4 +1,5 @@
 import { createContext, useContext, useState, type ReactNode } from 'react';
+import type { DifficultyId } from '../game/landscape';
 
 export type Lang = 'it' | 'en';
 
@@ -35,7 +36,7 @@ export interface Dict {
   viewLeaderboard: string;
   shotsCount: (n: number) => string;
 
-  diffBlurb: Record<'easy' | 'medium' | 'hard', string>;
+  diffBlurb: Record<DifficultyId, string>;
   paletteBlurb: Record<'sunset' | 'viridis' | 'cividis' | 'iceFire', string>;
 
   // ---- tutorial cards
@@ -139,6 +140,7 @@ const en: Dict = {
     easy: 'One smooth valley, exact gradient — just follow the arrow downhill.',
     medium: 'Bumpy terrain, noisy gradient, half the view, speckled.',
     hard: 'A hidden 4th dimension and a small window of visibility.',
+    extreme: 'Hyper-SGD 4D on a brand-new random map every round — no memorising the minimum.',
   },
   paletteBlurb: {
     sunset: 'Default — high-contrast, most colourful',
@@ -243,6 +245,7 @@ const it: Dict = {
     easy: 'Una valle liscia, gradiente esatto — segui semplicemente la freccia in discesa.',
     medium: 'Terreno accidentato, gradiente rumoroso, metà visuale, a chiazze.',
     hard: 'Una quarta dimensione nascosta e una piccola finestra di visibilità.',
+    extreme: 'Hyper-SGD 4D su una mappa casuale sempre nuova a ogni partita — niente minimi imparati a memoria.',
   },
   paletteBlurb: {
     sunset: 'Predefinito — alto contrasto, più colorato',

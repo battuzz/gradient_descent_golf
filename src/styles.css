@@ -83,6 +83,7 @@ h1 { font-size: 22px; margin: 8px 0 4px; letter-spacing: -0.02em; }
 .diff.easy { border-color: #2f6b4a; }
 .diff.medium { border-color: #7a6420; }
 .diff.hard { border-color: #7a2f45; }
+.diff.extreme { border-color: #5a2f7a; }
 .diff-top { display: flex; justify-content: space-between; align-items: center; font-size: 16px; }
 .mult { color: var(--accent); font-weight: 700; font-size: 13px; }
 .diff-blurb { color: var(--muted); font-size: 13px; }

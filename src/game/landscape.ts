@@ -1,6 +1,6 @@
 export type Vec3 = [number, number, number];
 
-export type DifficultyId = 'easy' | 'medium' | 'hard';
+export type DifficultyId = 'easy' | 'medium' | 'hard' | 'extreme';
 
 export interface Difficulty {
   id: DifficultyId;
@@ -23,23 +23,32 @@ export interface Difficulty {
   pixelSample: number;
   multiplier: number;
   autoAim: boolean;
+  /** Draw a fresh landscape every round instead of the per-event shared course, so the location
+   *  of the minimum can't be memorised from a previous play. */
+  randomMap: boolean;
 }
 
 export const DIFFICULTIES: Difficulty[] = [
   {
     id: 'easy', label: 'Batch GD',
     shots: 8, fourD: false, decoys: 0, ripple: 0.03, gradNoise: 0, landNoise: 0,
-    vision: 0.6, pixelSample: 1, multiplier: 1, autoAim: true,
+    vision: 0.6, pixelSample: 1, multiplier: 1, autoAim: true, randomMap: false,
   },
   {
     id: 'medium', label: 'SGD',
     shots: 7, fourD: false, decoys: 5, ripple: 0.11, gradNoise: 0.3, landNoise: 0.03,
-    vision: 0.21, pixelSample: 0.5, multiplier: 1.25, autoAim: false,
+    vision: 0.21, pixelSample: 0.5, multiplier: 1.25, autoAim: false, randomMap: false,
   },
   {
     id: 'hard', label: 'Hyper-SGD 4D',
     shots: 7, fourD: true, decoys: 7, ripple: 0.16, gradNoise: 0.45, landNoise: 0.05,
-    vision: 0.26, pixelSample: 1, multiplier: 1.5, autoAim: false,
+    vision: 0.26, pixelSample: 1, multiplier: 1.5, autoAim: false, randomMap: false,
+  },
+  {
+    // identical to Hyper-SGD 4D, but on a brand-new random map every round
+    id: 'extreme', label: 'Hyper-SGD 4D ∞',
+    shots: 7, fourD: true, decoys: 7, ripple: 0.16, gradNoise: 0.45, landNoise: 0.05,
+    vision: 0.26, pixelSample: 1, multiplier: 2, autoAim: false, randomMap: true,
   },
 ];
 
