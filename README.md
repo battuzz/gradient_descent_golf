@@ -13,11 +13,14 @@ can be hosted for free on GitHub Pages, with scores published live to Firestore.
 
 ## How it plays
 
-- Pick a name and a difficulty (Batch GD / SGD / Hyper-SGD 4D — noise, fog-of-war
-  radius, and decoy valleys increase with difficulty).
+- Pick a name and a difficulty (Batch GD / SGD / Hyper-SGD 4D / Hyper-SGD 4D ∞ — noise,
+  fog-of-war radius, and decoy valleys increase with difficulty).
 - Each level's landscape is procedurally generated from a seed of
   `event name + difficulty`, so **everyone playing the same event on the same
   difficulty competes on the identical course** — fair leaderboard comparisons.
+  The exception is **Hyper-SGD 4D ∞**: same rules as Hyper-SGD 4D, but every round
+  draws a brand-new random map, so nobody can replay to memorise where the minimum
+  is. That's why it pays a higher ×2 multiplier.
 - **Drag** anywhere on the map to shoot: direction = descent direction, drag
   length = learning rate. On Batch GD the direction auto-follows the gradient hint
   (you just choose the learning rate); on the noisier levels you aim manually.

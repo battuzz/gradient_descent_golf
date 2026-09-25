@@ -316,7 +316,9 @@ function Round({
   onAgain: () => void; onMenu: () => void;
 }) {
   const { t } = useLang();
-  const seed = `${event}:${diff.id}`;
+  // shared per-event course, unless the level asks for a never-seen-before map each round
+  const [salt] = useState(() => (diff.randomMap ? `:${Math.random().toString(36).slice(2)}` : ''));
+  const seed = `${event}:${diff.id}${salt}`;
   const ls = useMemo(() => buildLandscape(seed, diff), [seed, diff]);
 
   const [path, setPath] = useState<Vec3[]>(() => [ls.start]);
