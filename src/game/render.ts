@@ -1,8 +1,5 @@
 import type { Landscape, Vec3 } from './landscape';
-import { isoDepth, isoProject, type IsoView } from './iso';
-
-/** Resolution of the offscreen heat-map (it is up-scaled smoothly on the visible canvas). */
-export const RES = 140;
+import { depth3D, project3D, HEIGHT_WORLD_SCALE, WORLD_SCALE, type Camera3D } from './camera3d';
 
 export type PaletteId = 'sunset' | 'viridis' | 'cividis' | 'iceFire';
 
@@ -86,7 +83,7 @@ export function lossColor(ls: Landscape, v: number, theme: PaletteId): string {
   return `rgb(${r | 0},${g | 0},${b | 0})`;
 }
 
-const FOG: [number, number, number] = [9, 13, 24];
+export const FOG: [number, number, number] = [9, 13, 24];
 const W_SIGMA = 0.32;
 
 /** Deterministic (seed, i, j) → [0, 1) pseudo-random value, stable across repaints. */
@@ -98,83 +95,9 @@ function pixelRand(seed: number, i: number, j: number): number {
   return h / 4294967296;
 }
 
-/**
- * Paints the loss slice at height `z` into `img`. Only regions near already-visited points
- * (the "fog of war") show their real colours, unless `revealAll` is set. `pixelSample` < 1
- * additionally keeps only a random fraction of those pixels — a sparse, speckled reveal
- * instead of a solid patch — so higher difficulties give you scattered samples, not the map.
- *
- * On 4D courses, older reveals fade out as the previewed slice `z` drifts from the w they were
- * seen at — but `ballXY` (where the ball is standing right now) stays fully visible around
- * itself at every `z`, so dragging the w-slider never blinds you to your own surroundings,
- * only to terrain you explored elsewhere.
- */
-export function paintHeat(
-  img: ImageData,
-  ls: Landscape,
-  z: number,
-  reveals: Vec3[],
-  ballXY: [number, number],
-  vision: number,
-  revealAll: boolean,
-  pixelSample: number,
-  theme: PaletteId,
-): void {
-  const d = img.data;
-  const stops = PALETTES[theme].stops;
-  const span = ls.hi - ls.lo;
-  const inner = vision * 0.55;
-  for (let j = 0; j < RES; j++) {
-    const y = -1 + (2 * (j + 0.5)) / RES;
-    for (let i = 0; i < RES; i++) {
-      const x = -1 + (2 * (i + 0.5)) / RES;
-      let a = 0;
-      if (revealAll) a = 1;
-      else {
-        // the ball's own neighbourhood: full visibility, no w falloff, at every slice
-        const bdx = x - ballXY[0];
-        const bdy = y - ballXY[1];
-        const bdd = Math.sqrt(bdx * bdx + bdy * bdy);
-        if (bdd < vision) a = bdd <= inner ? 1 : 1 - (bdd - inner) / (vision - inner);
-
-        for (let n = 0; n < reveals.length; n++) {
-          const p = reveals[n];
-          const dx = x - p[0];
-          const dy = y - p[1];
-          const dd = Math.sqrt(dx * dx + dy * dy);
-          if (dd >= vision) continue;
-          let w = dd <= inner ? 1 : 1 - (dd - inner) / (vision - inner);
-          if (ls.fourD) {
-            const dz = (z - p[2]) / W_SIGMA;
-            w *= Math.exp(-dz * dz);
-          }
-          if (w > a) a = w;
-        }
-        if (a > 0.01 && pixelSample < 1 && pixelRand(ls.seedHash, i, j) >= pixelSample) a = 0;
-      }
-      const o = (j * RES + i) * 4;
-      if (a <= 0.01) {
-        d[o] = FOG[0]; d[o + 1] = FOG[1]; d[o + 2] = FOG[2]; d[o + 3] = 255;
-        continue;
-      }
-      const v = ls.loss(x, y, z);
-      const t = (v - ls.lo) / span;
-      const [r, g, b] = palette(stops, t);
-      // contour lines — darkened harder than the base palette for a punchier, more legible relief
-      const band = t * 16;
-      const line = Math.abs(band - Math.round(band));
-      const shade = line < 0.07 ? 0.55 : 1;
-      a = a * a * (3 - 2 * a);
-      d[o] = FOG[0] + (r * shade - FOG[0]) * a;
-      d[o + 1] = FOG[1] + (g * shade - FOG[1]) * a;
-      d[o + 2] = FOG[2] + (b * shade - FOG[2]) * a;
-      d[o + 3] = 255;
-    }
-  }
-}
-
-/** Mesh resolution of the 3D relief view (quads per side). */
-export const TERRAIN_GRID = 32;
+/** Mesh resolution of the terrain (quads per side). Slightly finer than the old top-down relief
+ * view, since the chase camera sits much closer to the ground and shows terrain up close. */
+export const TERRAIN_GRID = 40;
 
 const clamp01 = (v: number) => (v < 0 ? 0 : v > 1 ? 1 : v);
 const clamp255 = (v: number) => (v < 0 ? 0 : v > 255 ? 255 : v | 0);
@@ -197,10 +120,16 @@ export interface TerrainMesh {
 }
 
 /**
- * Samples the loss landscape into a heightfield mesh (loss -> elevation) with the same
- * fog-of-war visibility as `paintHeat`. Unlike the flat heat-map, unrevealed vertices keep
- * their real elevation and colour — `drawTerrainMesh` uses `vis` to skip drawing them
- * entirely, rather than flattening them into a visible "fog plane".
+ * Samples the loss landscape into a heightfield mesh (loss -> elevation). Only regions near
+ * already-visited points (the "fog of war") get real visibility, unless `revealAll` is set —
+ * unrevealed vertices keep their real elevation and colour, but `drawTerrainMesh` uses `vis` to
+ * skip drawing them entirely, rather than flattening them into a visible "fog plane". `pixelSample`
+ * < 1 additionally keeps only a random fraction of revealed vertices lit — a sparse, speckled
+ * reveal instead of a solid patch — so higher difficulties give scattered glimpses, not the map.
+ *
+ * On 4D courses, older reveals fade out as the previewed slice `z` drifts from the w they were
+ * seen at — but `ballXY` (where the ball is standing right now) stays fully visible around itself
+ * at every `z`, so dragging the w-slider never blinds you to your own surroundings.
  */
 export function buildTerrainMesh(
   ls: Landscape,
@@ -209,6 +138,7 @@ export function buildTerrainMesh(
   ballXY: [number, number],
   vision: number,
   revealAll: boolean,
+  pixelSample: number,
   theme: PaletteId,
 ): TerrainMesh {
   const stops = PALETTES[theme].stops;
@@ -247,7 +177,9 @@ export function buildTerrainMesh(
       const [r, g, b] = palette(stops, t);
       const k = vidx(i, j);
       elev[k] = t;
-      vis[k] = smooth(clamp01(visAlpha(x, y)));
+      let a = visAlpha(x, y);
+      if (a > 0.01 && pixelSample < 1 && pixelRand(ls.seedHash, i, j) >= pixelSample) a = 0;
+      vis[k] = smooth(clamp01(a));
       col[k * 3] = r; col[k * 3 + 1] = g; col[k * 3 + 2] = b;
     }
   }
@@ -255,15 +187,17 @@ export function buildTerrainMesh(
 }
 
 /**
- * Reprojects and draws a mesh built by `buildTerrainMesh` through the given camera — cheap
- * (no loss/palette sampling), so it's safe to call every animation frame while the camera
- * orbits. Quads that are entirely unexplored are skipped, not drawn as a flat "fog plane".
+ * Reprojects and draws a mesh built by `buildTerrainMesh` through the given chase camera — cheap
+ * (no loss/palette sampling), so it's safe to call every animation frame while the camera orbits
+ * and follows the ball. Quads that are entirely unexplored, or that fall behind the camera, are
+ * skipped rather than drawn as a flat "fog plane" or clipped mid-polygon.
  */
-export function drawTerrainMesh(ctx: CanvasRenderingContext2D, mesh: TerrainMesh, view: IsoView): void {
+export function drawTerrainMesh(ctx: CanvasRenderingContext2D, mesh: TerrainMesh, cam: Camera3D): void {
   const N = mesh.grid;
   const verts = N + 1;
   const { elev, vis, col } = mesh;
   const vidx = (i: number, j: number) => j * verts + i;
+  const S = WORLD_SCALE;
 
   const cells: [number, number, number][] = [];
   for (let j = 0; j < N; j++) {
@@ -273,7 +207,9 @@ export function drawTerrainMesh(ctx: CanvasRenderingContext2D, mesh: TerrainMesh
       if (v <= VIS_CUTOFF) continue; // unexplored: not drawn at all, rather than a flat plane
       const cx = -1 + (2 * i + 1) / N, cy = -1 + (2 * j + 1) / N;
       const ce = (elev[k00] + elev[k10] + elev[k01] + elev[k11]) / 4;
-      cells.push([i, j, isoDepth(view, cx, cy, ce)]);
+      const d = depth3D(cam, cx * S, cy * S, ce * HEIGHT_WORLD_SCALE);
+      if (d < 0.15) continue; // behind (or right on top of) the camera
+      cells.push([i, j, d]);
     }
   }
   // painter's algorithm: paint back-to-front so nearer quads correctly overdraw farther ones
@@ -284,6 +220,12 @@ export function drawTerrainMesh(ctx: CanvasRenderingContext2D, mesh: TerrainMesh
     const y0 = -1 + (2 * j) / N, y1 = -1 + (2 * (j + 1)) / N;
     const k00 = vidx(i, j), k10 = vidx(i + 1, j), k01 = vidx(i, j + 1), k11 = vidx(i + 1, j + 1);
     const e00 = elev[k00], e10 = elev[k10], e01 = elev[k01], e11 = elev[k11];
+
+    const p00 = project3D(cam, x0 * S, y0 * S, e00 * HEIGHT_WORLD_SCALE);
+    const p10 = project3D(cam, x1 * S, y0 * S, e10 * HEIGHT_WORLD_SCALE);
+    const p11 = project3D(cam, x1 * S, y1 * S, e11 * HEIGHT_WORLD_SCALE);
+    const p01 = project3D(cam, x0 * S, y1 * S, e01 * HEIGHT_WORLD_SCALE);
+    if (!p00 || !p10 || !p11 || !p01) continue; // a corner crosses the near plane: skip, don't clip
 
     const dEdx = ((e10 + e11 - e00 - e01) / 2) * SLOPE_K;
     const dEdy = ((e01 + e11 - e00 - e10) / 2) * SLOPE_K;
@@ -296,19 +238,14 @@ export function drawTerrainMesh(ctx: CanvasRenderingContext2D, mesh: TerrainMesh
     const cb = (col[k00 * 3 + 2] + col[k10 * 3 + 2] + col[k01 * 3 + 2] + col[k11 * 3 + 2]) / 4;
     const alpha = (vis[k00] + vis[k10] + vis[k01] + vis[k11]) / 4;
 
-    const [p00x, p00y] = isoProject(view, x0, y0, e00);
-    const [p10x, p10y] = isoProject(view, x1, y0, e10);
-    const [p11x, p11y] = isoProject(view, x1, y1, e11);
-    const [p01x, p01y] = isoProject(view, x0, y1, e01);
-
     const fill = `rgb(${clamp255(cr * bright)},${clamp255(cg * bright)},${clamp255(cb * bright)})`;
     ctx.globalAlpha = alpha;
     ctx.fillStyle = fill;
     ctx.beginPath();
-    ctx.moveTo(p00x, p00y);
-    ctx.lineTo(p10x, p10y);
-    ctx.lineTo(p11x, p11y);
-    ctx.lineTo(p01x, p01y);
+    ctx.moveTo(p00[0], p00[1]);
+    ctx.lineTo(p10[0], p10[1]);
+    ctx.lineTo(p11[0], p11[1]);
+    ctx.lineTo(p01[0], p01[1]);
     ctx.closePath();
     ctx.fill();
     // stroking each quad in its own fill colour papers over the hairline anti-aliasing seams

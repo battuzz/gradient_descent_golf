@@ -89,8 +89,7 @@ h1 { font-size: 22px; margin: 8px 0 4px; letter-spacing: -0.02em; }
 .diff-blurb { color: var(--muted); font-size: 13px; }
 .diff-meta { color: var(--muted); font-size: 12px; }
 
-/* ---------- topbar / stats ---------- */
-.topbar { display: flex; align-items: center; gap: 10px; }
+/* ---------- HUD row (top/bottom overlay bars) ---------- */
 .icon-btn {
   width: 38px; height: 38px; border-radius: 50%; border: 1px solid var(--border);
   background: var(--panel-solid); font-size: 18px; cursor: pointer;
@@ -119,58 +118,22 @@ h1 { font-size: 22px; margin: 8px 0 4px; letter-spacing: -0.02em; }
 .theme-option-text b { font-size: 13px; }
 .theme-check { color: var(--accent); font-weight: 700; }
 
-.stats { display: grid; grid-auto-flow: column; gap: 8px; }
-.stat {
-  background: var(--panel-solid); border: 1px solid var(--border); border-radius: 12px;
-  padding: 8px 10px; display: flex; flex-direction: column; gap: 2px; flex: 1;
-}
-.stat span { font-size: 10px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); }
-.stat b { font-size: 16px; }
-.stat.accent b { color: var(--accent); }
+.hud-stats { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 12px; color: var(--muted); pointer-events: none; }
+.hud-stats b { color: var(--text); font-variant-numeric: tabular-nums; }
+.hud-stats .accent, .hud-stats .accent b { color: var(--accent); }
 
-/* ---------- canvas ---------- */
-.canvas-row { display: flex; align-items: stretch; gap: 8px; }
-.canvas-wrap {
-  flex: 1; min-width: 0; aspect-ratio: 1 / 1; border-radius: var(--radius); overflow: hidden;
-  border: 1px solid var(--border); background: #0d1420; touch-action: none; position: relative;
-  transition: border-color 0.15s, box-shadow 0.15s;
-}
-/* pan mode changes what dragging does, so the whole map gets an unmissable amber tint */
-.canvas-wrap.pan-mode {
-  border-color: #ffd666; box-shadow: 0 0 0 2px rgba(255,214,102,0.3) inset;
-}
+/* ---------- full-screen 3D stage: the canvas fills the whole viewport, HUD chrome floats as
+   translucent overlays on top so the game area itself is never shrunk to make room for it ---------- */
+.stage { position: relative; flex: 1; min-height: 0; width: 100%; overflow: hidden; }
+.canvas-wrap { position: absolute; inset: 0; touch-action: none; background: #0d1420; }
 .game-canvas { width: 100%; height: 100%; display: block; touch-action: none; }
-.canvas-wrap.pan-mode .game-canvas { cursor: grab; }
-.canvas-wrap.pan-mode .game-canvas:active { cursor: grabbing; }
 
-.view-controls {
-  position: absolute; right: 8px; top: 8px; z-index: 2;
-  display: flex; gap: 4px;
-}
-.view-controls button {
-  width: 32px; height: 32px; border-radius: 50%; border: 1px solid var(--border);
-  background: rgba(16,24,40,0.75); backdrop-filter: blur(4px);
-  color: var(--text); font-size: 15px; line-height: 1; cursor: pointer; display: flex;
-  align-items: center; justify-content: center;
-}
-.view-controls button[aria-pressed="true"] { border-color: var(--accent-2); }
-.view-controls button.pan-active {
-  border-color: #ffd666; background: rgba(255,214,102,0.22);
-  box-shadow: 0 0 0 2px rgba(255,214,102,0.35);
-}
-
-.mode-badge {
-  position: absolute; left: 8px; top: 8px; z-index: 2;
-  display: flex; align-items: center; gap: 5px;
-  background: rgba(255,214,102,0.18); border: 1px solid rgba(255,214,102,0.65);
-  color: #ffd666; font-weight: 700; font-size: 11px; letter-spacing: 0.02em;
-  border-radius: 999px; padding: 5px 10px 5px 8px;
-}
-
+/* vertically centred on the right edge — clear of both the top and bottom HUD bars, and an easy
+   thumb reach on a phone held in either hand */
 .cam-controls {
-  position: absolute; right: 10px; bottom: 10px; z-index: 2;
-  display: flex; gap: 4px; background: rgba(16,24,40,0.75); backdrop-filter: blur(4px);
-  border: 1px solid var(--border); border-radius: 999px; padding: 4px;
+  position: absolute; right: 10px; top: 50%; transform: translateY(-50%); z-index: 3;
+  display: flex; flex-direction: column; gap: 4px; background: rgba(16,24,40,0.75);
+  backdrop-filter: blur(4px); border: 1px solid var(--border); border-radius: 999px; padding: 4px;
 }
 .cam-controls button {
   width: 28px; height: 28px; border-radius: 50%; border: none; background: transparent;
@@ -179,24 +142,36 @@ h1 { font-size: 22px; margin: 8px 0 4px; letter-spacing: -0.02em; }
 }
 .cam-controls button:hover { background: rgba(255,255,255,0.1); }
 
-.color-bar { flex: none; width: 40px; display: flex; flex-direction: column; align-items: center; gap: 4px; }
-.color-bar-end { display: flex; flex-direction: column; align-items: center; gap: 1px; }
-.color-bar-tag { font-size: 9px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); }
-.color-bar-value { font-size: 11px; font-weight: 700; }
-.color-bar-track {
-  flex: 1; width: 14px; border-radius: 7px; border: 1px solid rgba(255,255,255,0.15);
-  background: var(--bar-v);
+.hud-top {
+  position: absolute; top: 0; left: 0; right: 0; z-index: 4; pointer-events: none;
+  display: flex; flex-direction: column; gap: 6px;
+  padding: max(8px, env(safe-area-inset-top)) max(10px, env(safe-area-inset-right)) 14px
+    max(10px, env(safe-area-inset-left));
+  background: linear-gradient(to bottom, rgba(4,7,14,0.7) 0%, rgba(4,7,14,0.35) 60%, transparent 100%);
 }
+.hud-top .row { pointer-events: auto; }
+
+.hud-bottom {
+  position: absolute; left: 0; right: 0; bottom: 0; z-index: 4;
+  display: flex; flex-direction: column; gap: 10px;
+  padding: 14px max(10px, env(safe-area-inset-right)) max(10px, env(safe-area-inset-bottom))
+    max(10px, env(safe-area-inset-left));
+  background: linear-gradient(to top, rgba(4,7,14,0.78) 0%, rgba(4,7,14,0.4) 55%, transparent 100%);
+  max-height: 46vh; overflow-y: auto; pointer-events: none;
+}
+.hud-bottom > * { pointer-events: auto; }
+.hud-bottom .row { flex-wrap: wrap; row-gap: 6px; }
+.hud-bottom.result {
+  align-items: center; text-align: center; max-height: 82vh;
+  background: linear-gradient(to top, rgba(4,7,14,0.92) 0%, rgba(4,7,14,0.55) 70%, transparent 100%);
+}
+
 .fs-icon {
   width: 18px; height: 18px; display: block; margin: auto;
   fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round;
 }
 
 /* ---------- controls ---------- */
-.controls { display: flex; flex-direction: column; gap: 12px; }
-.spark { width: 100%; height: 40px; }
-.spark-t { fill: var(--muted); font-size: 8px; }
-
 .slider { display: flex; flex-direction: column; gap: 6px; }
 .slider-label { display: flex; justify-content: space-between; align-items: center; font-size: 13px; }
 .slider-track { position: relative; height: 28px; display: flex; align-items: center; }
@@ -210,14 +185,6 @@ h1 { font-size: 22px; margin: 8px 0 4px; letter-spacing: -0.02em; }
 .recap-slider .slider-label > span:first-child { white-space: nowrap; }
 .recap-slider .row { flex-wrap: nowrap !important; }
 .chip.goal { border-color: #ff4d6d; }
-
-.toggle {
-  display: flex; align-items: center; gap: 8px; background: var(--panel-solid);
-  border: 1px solid var(--border); border-radius: 999px; padding: 8px 14px 8px 8px; cursor: pointer;
-  font-size: 13px; font-weight: 600;
-}
-.toggle .knob { width: 18px; height: 18px; border-radius: 50%; background: #3a4a68; transition: background 0.15s; }
-.toggle.on .knob { background: var(--accent); }
 
 .chip {
   background: #17253f; border: 1px solid var(--border); color: var(--text);
@@ -438,68 +405,20 @@ h1 { font-size: 22px; margin: 8px 0 4px; letter-spacing: -0.02em; }
 }
 
 
-/* ---------- immersive (full screen) play layout ----------
-   The default. The round takes the whole viewport, and the map becomes the largest square that
-   fits whatever space the HUD leaves: below the HUD in portrait, beside it in landscape. */
-body:has(.page.play.immersive) { overflow: hidden; }
-body:has(.page.play.immersive) .lang-switch { display: none; }
+/* ---------- full-screen play layout ----------
+   The game area is maximized: the 3D stage fills the entire viewport, and every other bit of
+   information (topbar, stats, controls, results) floats over it as a translucent HUD instead of
+   claiming its own row of screen space. */
+body:has(.page.play) { overflow: hidden; }
+body:has(.page.play) .lang-switch { display: none; }
 
-.page.play.immersive {
-  --bar: 34px; /* colour-bar thickness */
+.page.play {
   flex: none;
   max-width: none;
+  width: 100vw;
   height: 100vh;
   height: 100dvh;
+  padding: 0;
+  gap: 0;
   overflow: hidden;
-  padding:
-    max(8px, env(safe-area-inset-top)) max(8px, env(safe-area-inset-right))
-    max(8px, env(safe-area-inset-bottom)) max(8px, env(safe-area-inset-left));
-  gap: 8px;
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  grid-template-rows: auto auto minmax(0, 1fr) auto;
-  grid-template-areas: "top" "stats" "map" "hud";
-}
-.immersive .topbar { grid-area: top; }
-.immersive .stats { grid-area: stats; gap: 6px; }
-.immersive .stat { padding: 5px 8px; border-radius: 10px; }
-.immersive .stat b { font-size: 15px; }
-.immersive .controls, .immersive .result { grid-area: hud; gap: 8px; min-height: 0; overflow-y: auto; }
-.immersive .result .row { flex-wrap: wrap; }
-.immersive .spark { height: 32px; }
-
-/* the map cell is a size container, so the canvas can be sized against both of its dimensions */
-.immersive .canvas-row {
-  grid-area: map; min-height: 0; container-type: size;
-  flex-direction: column; align-items: center; justify-content: center; gap: 6px;
-}
-.immersive .canvas-wrap {
-  flex: none;
-  width: min(100cqw, 100cqh - var(--bar) - 6px);
-}
-/* portrait: the colour scale runs horizontally under the map (min on the left) so the map can
-   use the full screen width */
-.immersive .color-bar {
-  width: min(100cqw, 100cqh - var(--bar) - 6px); height: var(--bar);
-  flex-direction: row-reverse; gap: 8px;
-}
-.immersive .color-bar-end { flex-direction: row; gap: 4px; align-items: baseline; }
-.immersive .color-bar-track { width: auto; height: 12px; align-self: center; background: var(--bar-h); }
-
-@media (orientation: landscape) {
-  .page.play.immersive {
-    grid-template-columns: minmax(0, 1fr) minmax(250px, 340px);
-    grid-template-rows: auto auto minmax(0, 1fr);
-    grid-template-areas: "map top" "map stats" "map hud";
-    column-gap: 12px;
-  }
-  .immersive .controls, .immersive .result { justify-content: flex-start; }
-  .immersive .canvas-row { flex-direction: row; }
-  .immersive .canvas-wrap { width: min(100cqw - var(--bar) - 6px, 100cqh); }
-  .immersive .color-bar {
-    width: var(--bar); height: min(100cqw - var(--bar) - 6px, 100cqh);
-    flex-direction: column; gap: 4px;
-  }
-  .immersive .color-bar-end { flex-direction: column; gap: 1px; align-items: center; }
-  .immersive .color-bar-track { width: 12px; height: auto; align-self: auto; background: var(--bar-v); }
 }

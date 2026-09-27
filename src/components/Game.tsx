@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   DIFFICULTIES, buildLandscape, computePoints, gauss, getDifficulty, hashString, rng,
   type Difficulty, type Vec3,
@@ -13,7 +13,6 @@ const NAME_KEY = 'gdg.name';
 const TUTORIAL_KEY = 'gdg.tutorialSeen';
 const FOURD_KEY = 'gdg.tutorial4dSeen';
 const THEME_KEY = 'gdg.theme';
-const VIEW3D_KEY = 'gdg.view3d';
 const FULLSCREEN_KEY = 'gdg.fullscreen';
 const W_STEP = 0.5; // max change of the 4th parameter per shot
 
@@ -61,14 +60,6 @@ export function Game({ event }: { event: string }) {
     setTheme(t);
     try { localStorage.setItem(THEME_KEY, t); } catch { /* ignore */ }
   };
-  const [view3d, setView3d] = useState<boolean>(() => {
-    try { return localStorage.getItem(VIEW3D_KEY) === '1'; } catch { return false; }
-  });
-  const changeView3d = (v: boolean) => {
-    setView3d(v);
-    try { localStorage.setItem(VIEW3D_KEY, v ? '1' : '0'); } catch { /* ignore */ }
-  };
-
   // full screen is the default: the map gets the whole viewport instead of a narrow column
   const [fullscreen, setFullscreen] = useState<boolean>(() => {
     try { return localStorage.getItem(FULLSCREEN_KEY) !== '0'; } catch { return true; }
@@ -108,8 +99,6 @@ export function Game({ event }: { event: string }) {
       diff={getDifficulty(diffId)}
       theme={theme}
       onThemeChange={changeTheme}
-      view3d={view3d}
-      onView3DChange={changeView3d}
       fullscreen={fullscreen}
       onToggleFullscreen={toggleFullscreen}
       onAgain={() => setRound((r) => r + 1)}
@@ -171,15 +160,17 @@ function Setup(props: {
 }
 
 /**
- * One idea per card, interleaved with actual play: a card blocks the game until dismissed,
- * then the player takes the shot it just taught them, then the next card appears. Tip 1
- * additionally renders a live colour-scale legend for the current theme.
+ * One idea per card, all shown back-to-back before the round begins: each card blocks the game
+ * until dismissed, then the next one appears immediately, with actual play starting only once
+ * the whole sequence is dismissed. Tip 1 additionally renders a live colour-scale legend for the
+ * current theme.
  */
 function tutorialTips(t: Dict): { icon: string; text: string; also?: string; note?: string; legend?: boolean }[] {
   return [
-    { icon: '🖱️', text: t.tipDrag },
+    { icon: '🖐️', text: t.tipDrag },
+    { icon: '🧭', text: t.tipOrbit },
     { icon: '🎯', legend: true, text: t.tipLegend, note: t.tipLegendNote },
-    { icon: '➤', text: t.tipArrow, also: t.tipArrowAlso },
+    { icon: '➤', text: t.tipArrow },
     { icon: '🌫️', text: t.tipFog },
   ];
 }
@@ -235,33 +226,6 @@ function FourDIntro({ onDismiss }: { onDismiss: () => void }) {
   );
 }
 
-/** Persistent legend beside the map: which colour is the minimum, which is the worst, and the
- *  actual loss values at each end — so the heat-map never has to be read by memory alone. */
-function ColorBar({ theme, lo, hi }: { theme: PaletteId; lo: number; hi: number }) {
-  const { t } = useLang();
-  return (
-    <div className="color-bar">
-      <div className="color-bar-end">
-        <span className="color-bar-tag">max</span>
-        <span className="color-bar-value">{hi.toFixed(2)}</span>
-      </div>
-      <div
-        className="color-bar-track"
-        style={{
-          '--bar-v': paletteSwatchCss(theme, 0),
-          '--bar-h': paletteSwatchCss(theme, 90),
-        } as CSSProperties}
-        role="img"
-        aria-label={t.colorBarAria}
-      />
-      <div className="color-bar-end">
-        <span className="color-bar-tag">min</span>
-        <span className="color-bar-value">{lo.toFixed(2)}</span>
-      </div>
-    </div>
-  );
-}
-
 function FullscreenIcon({ exit }: { exit: boolean }) {
   return (
     <svg className="fs-icon" viewBox="0 0 24 24" aria-hidden="true">
@@ -308,10 +272,9 @@ function ThemePicker({ theme, onChange }: { theme: PaletteId; onChange: (t: Pale
 // ---------------------------------------------------------------- round
 
 function Round({
-  event, name, diff, theme, onThemeChange, view3d, onView3DChange, fullscreen, onToggleFullscreen, onAgain, onMenu,
+  event, name, diff, theme, onThemeChange, fullscreen, onToggleFullscreen, onAgain, onMenu,
 }: {
   event: string; name: string; diff: Difficulty; theme: PaletteId; onThemeChange: (t: PaletteId) => void;
-  view3d: boolean; onView3DChange: (v: boolean) => void;
   fullscreen: boolean; onToggleFullscreen: () => void;
   onAgain: () => void; onMenu: () => void;
 }) {
@@ -328,7 +291,6 @@ function Round({
   const [wTarget, setWTarget] = useState(ls.start[2]);
   // after the round, the revealed map can be browsed slice by slice; null = the ball's own slice
   const [recapW, setRecapW] = useState<number | null>(null);
-  const [autoAim, setAutoAim] = useState(diff.autoAim);
   const [earlyStop, setEarlyStop] = useState(false);
   const [confirmStop, setConfirmStop] = useState(false);
   const confirmTimer = useRef<number | undefined>(undefined);
@@ -344,8 +306,7 @@ function Round({
     try { localStorage.setItem(FOURD_KEY, '1'); } catch { /* ignore */ }
     setFourDSeen(true);
   };
-  // one card per shot taken so far: card[n] blocks play until dismissed, then shot n happens,
-  // which is what reveals card[n+1] — teaching by having them immediately do the thing just shown
+  // the whole sequence blocks play up front, one card at a time, before the first shot
   const [dismissedCount, setDismissedCount] = useState(0);
   const dismissTutorial = () => {
     try { localStorage.setItem(TUTORIAL_KEY, '1'); } catch { /* ignore */ }
@@ -354,8 +315,8 @@ function Round({
 
   const shotsTaken = path.length - 1;
   const done = (shotsTaken >= diff.shots || earlyStop) && !flight;
-  const TIP_COUNT = 4;
-  const tipShowing = !fourDPending && !tutorialSeen && !done && dismissedCount < TIP_COUNT && shotsTaken === dismissedCount;
+  const TIP_COUNT = 5;
+  const tipShowing = !fourDPending && !tutorialSeen && !done && dismissedCount < TIP_COUNT;
   const blocked = fourDPending || tipShowing;
   const nextTip = () => {
     const n = dismissedCount + 1;
@@ -465,38 +426,8 @@ function Round({
   const pct = (v: number) => ((v + 1) / 2) * 100;
 
   return (
-    <div className={`page play${fullscreen ? ' immersive' : ''}`}>
-      <div className="topbar">
-        <button className="icon-btn" onClick={onMenu} aria-label={t.backAria}>←</button>
-        <div className="title">
-          <b>{diff.label}</b>
-          <span className="muted">{name}</span>
-        </div>
-        <div className="shots" aria-label={t.shotsLeftAria(diff.shots - shotsTaken)}>
-          {Array.from({ length: diff.shots }, (_, i) => (
-            <i key={i} className={i < shotsTaken ? 'used' : ''} />
-          ))}
-        </div>
-        <ThemePicker theme={theme} onChange={onThemeChange} />
-        <button
-          className="icon-btn"
-          onClick={onToggleFullscreen}
-          aria-label={fullscreen ? t.exitFullscreenAria : t.enterFullscreenAria}
-          aria-pressed={fullscreen}
-          title={fullscreen ? t.exitFullscreenAria : t.enterFullscreenAria}
-        >
-          <FullscreenIcon exit={fullscreen} />
-        </button>
-      </div>
-
-      <div className="stats">
-        <Stat label={t.statLossNow} value={losses[losses.length - 1].toFixed(3)} />
-        <Stat label={t.statBest} value={Number.isFinite(bestLoss) ? bestLoss.toFixed(3) : '—'} accent />
-        <Stat label="‖∇L‖" value={hint.mag.toFixed(2)} />
-        {ls.fourD && <Stat label="w" value={cur[2].toFixed(2)} />}
-      </div>
-
-      <div className="canvas-row">
+    <div className="page play">
+      <div className="stage">
         <GameCanvas
           ls={ls}
           diff={diff}
@@ -508,143 +439,134 @@ function Round({
           reveals={reveals}
           flight={flight}
           hintDir={hint.dir}
-          autoAim={autoAim}
           disabled={done || blocked}
           revealAll={done}
-          view3d={view3d}
-          onView3DChange={onView3DChange}
           onShoot={onShoot}
           onLand={onLand}
         />
-        <ColorBar theme={theme} lo={ls.lo} hi={ls.hi} />
-      </div>
 
-      {fourDPending ? (
-        <FourDIntro onDismiss={dismissFourD} />
-      ) : (
-        tipShowing && <TutorialOverlay step={dismissedCount} theme={theme} onNext={nextTip} onSkip={skipTutorial} />
-      )}
-
-      {!done ? (
-        <div className="controls">
-          <Sparkline losses={losses} lo={ls.lo} hi={ls.hi} />
-          {ls.fourD && (
-            <div className="slider">
-              <div className="slider-label">
-                <span>{t.fourthDimLabel} <b>w</b> → {wTarget.toFixed(2)}</span>
-                <button className="chip" onClick={() => setWTarget(zHint)}>{t.useGrad}</button>
-              </div>
-              <div className="slider-track">
-                <input
-                  type="range"
-                  min={-1}
-                  max={1}
-                  step={0.01}
-                  value={wTarget}
-                  disabled={!!flight}
-                  onChange={(e) => setWTarget(Number(e.target.value))}
-                />
-                <span className="tick now" style={{ left: `${pct(cur[2])}%` }} title="current" />
-                <span className="tick hint" style={{ left: `${pct(zHint)}%` }} title="gradient hint" />
-              </div>
+        <div className="hud-top">
+          <div className="row">
+            <button className="icon-btn" onClick={onMenu} aria-label={t.backAria}>←</button>
+            <div className="title">
+              <b>{diff.label}</b>
+              <span className="muted">{name}</span>
             </div>
-          )}
-          {view3d ? (
+            <div className="shots" aria-label={t.shotsLeftAria(diff.shots - shotsTaken)}>
+              {Array.from({ length: diff.shots }, (_, i) => (
+                <i key={i} className={i < shotsTaken ? 'used' : ''} />
+              ))}
+            </div>
+            <ThemePicker theme={theme} onChange={onThemeChange} />
+            <button
+              className="icon-btn"
+              onClick={onToggleFullscreen}
+              aria-label={fullscreen ? t.exitFullscreenAria : t.enterFullscreenAria}
+              aria-pressed={fullscreen}
+              title={fullscreen ? t.exitFullscreenAria : t.enterFullscreenAria}
+            >
+              <FullscreenIcon exit={fullscreen} />
+            </button>
+          </div>
+          <div className="hud-stats">
+            <span>{t.statLossNow} <b>{losses[losses.length - 1].toFixed(3)}</b></span>
+            <span className="accent">{t.statBest} <b>{Number.isFinite(bestLoss) ? bestLoss.toFixed(3) : '—'}</b></span>
+            <span>‖∇L‖ <b>{hint.mag.toFixed(2)}</b></span>
+            {ls.fourD && <span>w <b>{cur[2].toFixed(2)}</b></span>}
+          </div>
+        </div>
+
+        {fourDPending ? (
+          <FourDIntro onDismiss={dismissFourD} />
+        ) : (
+          tipShowing && <TutorialOverlay step={dismissedCount} theme={theme} onNext={nextTip} onSkip={skipTutorial} />
+        )}
+
+        {!done ? (
+          <div className="hud-bottom">
+            {ls.fourD && (
+              <div className="slider">
+                <div className="slider-label">
+                  <span>{t.fourthDimLabel} <b>w</b> → {wTarget.toFixed(2)}</span>
+                  <button className="chip" onClick={() => setWTarget(zHint)}>{t.useGrad}</button>
+                </div>
+                <div className="slider-track">
+                  <input
+                    type="range"
+                    min={-1}
+                    max={1}
+                    step={0.01}
+                    value={wTarget}
+                    disabled={!!flight}
+                    onChange={(e) => setWTarget(Number(e.target.value))}
+                  />
+                  <span className="tick now" style={{ left: `${pct(cur[2])}%` }} title="current" />
+                  <span className="tick hint" style={{ left: `${pct(zHint)}%` }} title="gradient hint" />
+                </div>
+              </div>
+            )}
             <div className="row center">
-              <span className="muted small">{t.dragToPanHint}</span>
-            </div>
-          ) : (
-            <div className="row">
-              <button className={`toggle ${autoAim ? 'on' : ''}`} onClick={() => setAutoAim((a) => !a)}>
-                <span className="knob" /> {t.autoAimToggle}
-              </button>
               <span className="muted small">
                 {shotsTaken === 0 ? t.dragToShootHint : t.shotsLeftText(diff.shots - shotsTaken)}
               </span>
             </div>
-          )}
-          {shotsTaken > 0 && (
-            <button className={`stop-btn ${confirmStop ? 'confirm' : ''}`} onClick={requestStop}>
-              {confirmStop ? t.tapAgainBtn : t.finishRoundBtn}
-            </button>
-          )}
-        </div>
-      ) : (
-        <div className="result">
-          <div className="result-points">
-            <span className="big">{shownPoints}</span> <span className="muted">{t.pointsWord}</span>
-          </div>
-          <div className="muted">
-            {t.bestLossPrefix} <b>{bestLoss.toFixed(3)}</b> · {t.globalMinPrefix} <b>{ls.lo.toFixed(3)}</b>
-            {earlyStop && shotsTaken < diff.shots && (
-              <> · {t.finishedEarly(shotsTaken, diff.shots)}</>
+            {shotsTaken > 0 && (
+              <button className={`stop-btn ${confirmStop ? 'confirm' : ''}`} onClick={requestStop}>
+                {confirmStop ? t.tapAgainBtn : t.finishRoundBtn}
+              </button>
             )}
           </div>
-          {ls.fourD && (
-            <div className="slider recap-slider">
-              <div className="slider-label">
-                <span>{t.exploreWLabel}: <b>w</b> = {(recapW ?? cur[2]).toFixed(2)}</span>
-                <span className="row gap-sm">
-                  <button className="chip" onClick={() => setRecapW(null)}>{t.yourWBtn}</button>
-                  <button className="chip goal" onClick={() => setRecapW(ls.best[2])}>{t.goalWBtn}</button>
-                </span>
-              </div>
-              <div className="slider-track">
-                <input
-                  type="range"
-                  min={-1}
-                  max={1}
-                  step={0.01}
-                  value={recapW ?? cur[2]}
-                  onChange={(e) => setRecapW(Number(e.target.value))}
-                />
-                <span className="tick now" style={{ left: `${pct(cur[2])}%` }} title={t.yourWBtn} />
-                <span className="tick goal" style={{ left: `${pct(ls.best[2])}%` }} title={t.goalWBtn} />
-              </div>
+        ) : (
+          <div className="hud-bottom result">
+            <div className="result-points">
+              <span className="big">{shownPoints}</span> <span className="muted">{t.pointsWord}</span>
             </div>
-          )}
-          <div className={`status ${status}`}>
-            {status === 'sending' && t.publishing}
-            {status === 'ok' && (myRank ? t.publishedRank(myRank.pos, myRank.total) : t.publishedNoRank)}
-            {status === 'error' && (
-              <>{t.publishFailed} <button className="chip" onClick={() => void send()}>{t.retryBtn}</button></>
+            <div className="muted">
+              {t.bestLossPrefix} <b>{bestLoss.toFixed(3)}</b> · {t.globalMinPrefix} <b>{ls.lo.toFixed(3)}</b>
+              {earlyStop && shotsTaken < diff.shots && (
+                <> · {t.finishedEarly(shotsTaken, diff.shots)}</>
+              )}
+            </div>
+            {ls.fourD && (
+              <div className="slider recap-slider">
+                <div className="slider-label">
+                  <span>{t.exploreWLabel}: <b>w</b> = {(recapW ?? cur[2]).toFixed(2)}</span>
+                  <span className="row gap-sm">
+                    <button className="chip" onClick={() => setRecapW(null)}>{t.yourWBtn}</button>
+                    <button className="chip goal" onClick={() => setRecapW(ls.best[2])}>{t.goalWBtn}</button>
+                  </span>
+                </div>
+                <div className="slider-track">
+                  <input
+                    type="range"
+                    min={-1}
+                    max={1}
+                    step={0.01}
+                    value={recapW ?? cur[2]}
+                    onChange={(e) => setRecapW(Number(e.target.value))}
+                  />
+                  <span className="tick now" style={{ left: `${pct(cur[2])}%` }} title={t.yourWBtn} />
+                  <span className="tick goal" style={{ left: `${pct(ls.best[2])}%` }} title={t.goalWBtn} />
+                </div>
+              </div>
             )}
-            {status === 'ok' && !usingFirebase && <div className="small muted">{t.demoModeNote}</div>}
+            <div className={`status ${status}`}>
+              {status === 'sending' && t.publishing}
+              {status === 'ok' && (myRank ? t.publishedRank(myRank.pos, myRank.total) : t.publishedNoRank)}
+              {status === 'error' && (
+                <>{t.publishFailed} <button className="chip" onClick={() => void send()}>{t.retryBtn}</button></>
+              )}
+              {status === 'ok' && !usingFirebase && <div className="small muted">{t.demoModeNote}</div>}
+            </div>
+            <div className="row gap">
+              <button className="btn primary" onClick={onAgain}>{t.playAgainBtn}</button>
+              <button className="btn" onClick={onMenu}>{t.changeLevelBtn}</button>
+              <button className="btn" onClick={() => navigate('/', event)}>{t.leaderboardBtn}</button>
+            </div>
           </div>
-          <div className="row gap">
-            <button className="btn primary" onClick={onAgain}>{t.playAgainBtn}</button>
-            <button className="btn" onClick={onMenu}>{t.changeLevelBtn}</button>
-            <button className="btn" onClick={() => navigate('/', event)}>{t.leaderboardBtn}</button>
-          </div>
-        </div>
-      )}
+        )}
+      </div>
     </div>
-  );
-}
-
-function Stat({ label, value, accent }: { label: string; value: string; accent?: boolean }) {
-  return (
-    <div className={`stat ${accent ? 'accent' : ''}`}>
-      <span>{label}</span>
-      <b>{value}</b>
-    </div>
-  );
-}
-
-function Sparkline({ losses, lo, hi }: { losses: number[]; lo: number; hi: number }) {
-  const { t } = useLang();
-  const W = 300;
-  const H = 40;
-  const n = Math.max(losses.length, 2);
-  const pts = losses.map((v, i) => {
-    const t2 = clamp((v - lo) / (hi - lo), 0, 1);
-    return `${(i / (n - 1)) * W},${4 + t2 * (H - 8)}`;
-  });
-  return (
-    <svg className="spark" viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none">
-      <polyline points={pts.join(' ')} fill="none" stroke="var(--accent)" strokeWidth="2.5" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
-      <text x="4" y="12" className="spark-t">{t.lossPerStep}</text>
-    </svg>
   );
 }
 

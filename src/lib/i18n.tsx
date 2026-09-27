@@ -54,10 +54,10 @@ export interface Dict {
 
   // ---- tutorial cards
   tipDrag: string;
+  tipOrbit: string;
   tipLegend: string;
   tipLegendNote: string;
   tipArrow: string;
-  tipArrowAlso: string;
   tipFog: string;
   tipNext: string;
   tipGotIt: string;
@@ -71,18 +71,14 @@ export interface Dict {
   fourDGotIt: string;
   dismissAria: string;
 
-  // ---- theme picker / colour bar
+  // ---- theme picker / camera controls
   changeColoursAria: string;
-  colorBarAria: string;
-  toggle3DAria: string;
   camControlsAria: string;
   rotateLeftAria: string;
   rotateRightAria: string;
   zoomInAria: string;
   zoomOutAria: string;
   resetViewAria: string;
-  dragToPanHint: string;
-  panModeBadge: string;
   enterFullscreenAria: string;
   exitFullscreenAria: string;
 
@@ -92,7 +88,6 @@ export interface Dict {
   statBest: string;
   fourthDimLabel: string;
   useGrad: string;
-  autoAimToggle: string;
   dragToShootHint: string;
   shotsLeftText: (n: number) => string;
   shotsLeftAria: (n: number) => string;
@@ -113,7 +108,6 @@ export interface Dict {
   playAgainBtn: string;
   changeLevelBtn: string;
   leaderboardBtn: string;
-  lossPerStep: string;
 
   // ---- canvas-drawn labels
   previewingLabel: (v: string) => string;
@@ -174,11 +168,11 @@ const en: Dict = {
     iceFire: 'Blue/orange — max contrast, no red-green',
   },
 
-  tipDrag: 'Drag on the map to shoot — how far you drag sets the learning rate.',
-  tipLegend: "This is the loss. Bright means good, dark means bad — aim for the brightest colour, that's the minimum!",
+  tipDrag: "Touch the ball and pull back to shoot — like a slingshot. It launches the opposite way, and how far you pull sets the learning rate.",
+  tipOrbit: 'Drag anywhere else to look around the ball; pinch with two fingers to zoom.',
+  tipLegend: "This is the loss, coloured onto the terrain. Bright means good, dark means bad — head for the brightest colour, that's the minimum!",
   tipLegendNote: 'You can customize the theme with the 🎨 in the top right.',
   tipArrow: 'Follow the pulsing yellow arrow: the (noisy) −gradient, your best guess at downhill.',
-  tipArrowAlso: 'Prefer to aim it yourself? Turn off Auto-aim.',
   tipFog: "Your information is limited — fog hides everything you haven't explored. Roam around to find the minimum!",
   tipNext: 'Next',
   tipGotIt: "Got it — let's golf",
@@ -187,32 +181,27 @@ const en: Dict = {
   legendMax: 'high loss',
 
   fourDPart1a: 'This level hides a 4th dimension,',
-  fourDPart1b: ". Drag the slider below the map to choose where you'll land along it.",
+  fourDPart1b: ". Drag the slider at the bottom to choose where you'll land along it.",
   fourDPart2: 'The white mark shows where you are now; the yellow mark shows where the gradient suggests moving.',
   fourDGotIt: 'Got it',
   dismissAria: 'Dismiss',
 
-  changeColoursAria: 'Change heat-map colours',
-  colorBarAria: 'Colour scale from highest loss (worst) at the top to lowest loss (best) at the bottom',
-  toggle3DAria: 'Switch between flat heat-map and 3D relief view',
-  camControlsAria: '3D camera controls',
+  changeColoursAria: 'Change terrain colours',
+  camControlsAria: 'Camera controls',
   rotateLeftAria: 'Rotate view left',
   rotateRightAria: 'Rotate view right',
   zoomInAria: 'Zoom in',
   zoomOutAria: 'Zoom out',
-  resetViewAria: 'Reset 3D view',
-  dragToPanHint: 'Drag to rotate the view · pinch or scroll to zoom',
-  panModeBadge: 'Pan & zoom mode',
+  resetViewAria: 'Reset camera',
   enterFullscreenAria: 'Play in full screen',
   exitFullscreenAria: 'Exit full screen',
 
   backAria: 'Back',
-  statLossNow: 'Loss now',
+  statLossNow: 'Loss',
   statBest: 'Best',
   fourthDimLabel: '4th dimension',
   useGrad: 'use ∇',
-  autoAimToggle: 'Auto-aim −∇',
-  dragToShootHint: 'Drag on the map to shoot',
+  dragToShootHint: 'Touch the ball and pull back to shoot',
   shotsLeftText: (n) => `${n} shots left`,
   shotsLeftAria: (n) => `${n} shots left`,
   finishRoundBtn: "I've found it — finish round",
@@ -231,7 +220,6 @@ const en: Dict = {
   playAgainBtn: 'Play again',
   changeLevelBtn: 'Change level',
   leaderboardBtn: 'Leaderboard',
-  lossPerStep: 'loss per step',
 
   previewingLabel: (v) => `previewing w = ${v}`,
   goalAtLabel: (v) => `goal at w=${v}`,
@@ -291,11 +279,11 @@ const it: Dict = {
     iceFire: 'Blu/arancione — massimo contrasto, niente rosso-verde',
   },
 
-  tipDrag: 'Trascina sulla mappa per tirare — quanto trascini imposta il learning rate.',
-  tipLegend: 'Questa è la loss. Chiaro è buono, scuro è cattivo — punta al colore più chiaro: quello è il minimo!',
+  tipDrag: 'Tocca la pallina e trascina indietro per tirare — come una fionda. Parte nella direzione opposta, e quanto trascini imposta il learning rate.',
+  tipOrbit: 'Trascina altrove per guardarti intorno; pizzica con due dita per zoomare.',
+  tipLegend: 'Questa è la loss, colorata sul terreno. Chiaro è buono, scuro è cattivo — punta al colore più chiaro: quello è il minimo!',
   tipLegendNote: 'Puoi personalizzare il tema con il 🎨 in alto a destra.',
   tipArrow: 'Segui la freccia gialla pulsante: il (rumoroso) −gradiente, la tua miglior stima della discesa.',
-  tipArrowAlso: 'Preferisci mirare da solo? Disattiva la Mira automatica.',
   tipFog: 'Le tue informazioni sono limitate — la nebbia nasconde tutto ciò che non hai esplorato. '
     + 'Esplora per trovare il minimo!',
   tipNext: 'Avanti',
@@ -305,32 +293,27 @@ const it: Dict = {
   legendMax: 'loss alta',
 
   fourDPart1a: 'Questo livello nasconde una quarta dimensione,',
-  fourDPart1b: '. Trascina lo slider sotto la mappa per scegliere dove atterrare lungo questa dimensione.',
+  fourDPart1b: '. Trascina lo slider in basso per scegliere dove atterrare lungo questa dimensione.',
   fourDPart2: 'Il segno bianco mostra dove ti trovi ora; il segno giallo mostra dove il gradiente suggerisce di muoversi.',
   fourDGotIt: 'Capito',
   dismissAria: 'Chiudi',
 
-  changeColoursAria: 'Cambia i colori della mappa',
-  colorBarAria: 'Scala colori: loss più alta (peggiore) in alto, loss più bassa (migliore) in basso',
-  toggle3DAria: 'Passa dalla mappa termica piatta alla vista in rilievo 3D',
-  camControlsAria: 'Controlli della fotocamera 3D',
+  changeColoursAria: 'Cambia i colori del terreno',
+  camControlsAria: 'Controlli della fotocamera',
   rotateLeftAria: 'Ruota la vista a sinistra',
   rotateRightAria: 'Ruota la vista a destra',
   zoomInAria: 'Aumenta lo zoom',
   zoomOutAria: 'Riduci lo zoom',
-  resetViewAria: 'Ripristina la vista 3D',
-  dragToPanHint: 'Trascina per ruotare la vista · pizzica o scorri per zoomare',
-  panModeBadge: 'Modalità pan e zoom',
+  resetViewAria: 'Ripristina la fotocamera',
   enterFullscreenAria: 'Gioca a schermo intero',
   exitFullscreenAria: 'Esci dallo schermo intero',
 
   backAria: 'Indietro',
-  statLossNow: 'Loss attuale',
+  statLossNow: 'Loss',
   statBest: 'Migliore',
   fourthDimLabel: '4ª dimensione',
   useGrad: 'usa ∇',
-  autoAimToggle: 'Mira automatica −∇',
-  dragToShootHint: 'Trascina sulla mappa per tirare',
+  dragToShootHint: 'Tocca la pallina e trascina indietro per tirare',
   shotsLeftText: (n) => `${n} tiri rimasti`,
   shotsLeftAria: (n) => `${n} tiri rimasti`,
   finishRoundBtn: 'Ho trovato il minimo — termina il turno',
@@ -349,7 +332,6 @@ const it: Dict = {
   playAgainBtn: 'Gioca ancora',
   changeLevelBtn: 'Cambia livello',
   leaderboardBtn: 'Classifica',
-  lossPerStep: 'loss per tiro',
 
   previewingLabel: (v) => `anteprima w = ${v}`,
   goalAtLabel: (v) => `obiettivo a w=${v}`,
